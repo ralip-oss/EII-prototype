@@ -198,7 +198,7 @@ export const DayDetail: React.FC<DayDetailProps> = ({
           </div>
           <div className="flex flex-col">
             <span className="font-headline font-semibold text-sm sm:text-base text-[#1b1c19] dark:text-white">
-              {completedTasks} of {totalTasks} tasks completed
+              {completedTasks} of {totalTasks} activities completed
             </span>
             <div className="flex items-center gap-2 text-xs text-[#444748] dark:text-[#a1a1aa] pt-0.5">
               <span className="flex items-center gap-1 font-semibold" style={{ color: activeDay.color }}>
@@ -286,7 +286,7 @@ export const DayDetail: React.FC<DayDetailProps> = ({
 
             {filteredTasks.length === 0 ? (
               <div className="py-12 text-center text-sm text-[#444748] dark:text-[#a1a1aa]">
-                No tasks match this filter. Take a breath and enjoy the open space.
+                No activities match this filter. Take a breath and enjoy the open space.
               </div>
             ) : (
               filteredTasks.map((task) => {

@@ -9,6 +9,7 @@ export interface CalendarDay {
   monthName: string; // "Oct", etc.
   dayNumber: number; // 12, etc.
   year: number; // 2026
+  fullDateStr: string; // "Monday, Oct 12"
   isToday: boolean;
   color: string;
 }
@@ -41,13 +42,27 @@ const FULL_DAY_NAMES = [
 
 const SHORT_DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// The real current date in this runtime: October 15, 2026
-export const BASE_TODAY = new Date(2026, 9, 15); // Month is 0-indexed: 9 = October
+/**
+ * Returns the actual real current date in local time
+ */
+export function getRealToday(): Date {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+export const BASE_TODAY = getRealToday();
+
+export function getTodayDayId(): DayId {
+  const today = getRealToday();
+  const day = today.getDay(); // 0 is Sun, 1 is Mon, ... 6 is Sat
+  const idx = day === 0 ? 6 : day - 1; // 0 for Mon, 6 for Sun
+  return DAY_IDS[idx];
+}
 
 /**
  * Returns the Monday date for the week containing the given date + offset in weeks
  */
-export function getMondayOfWeek(referenceDate: Date, weekOffset: number = 0): Date {
+export function getMondayOfWeek(referenceDate: Date = getRealToday(), weekOffset: number = 0): Date {
   const d = new Date(referenceDate);
   // In JS, getDay(): 0 is Sunday, 1 is Monday, ..., 6 is Saturday
   const day = d.getDay();
@@ -60,7 +75,8 @@ export function getMondayOfWeek(referenceDate: Date, weekOffset: number = 0): Da
 /**
  * Returns the 7 days of the week starting from the Monday calculated with weekOffset
  */
-export function getWeekDays(referenceDate: Date = BASE_TODAY, weekOffset: number = 0): CalendarDay[] {
+export function getWeekDays(referenceDate: Date = getRealToday(), weekOffset: number = 0): CalendarDay[] {
+  const realToday = getRealToday();
   const monday = getMondayOfWeek(referenceDate, weekOffset);
   const days: CalendarDay[] = [];
 
@@ -69,9 +85,9 @@ export function getWeekDays(referenceDate: Date = BASE_TODAY, weekOffset: number
     curDate.setDate(monday.getDate() + i);
 
     const isToday =
-      curDate.getFullYear() === BASE_TODAY.getFullYear() &&
-      curDate.getMonth() === BASE_TODAY.getMonth() &&
-      curDate.getDate() === BASE_TODAY.getDate();
+      curDate.getFullYear() === realToday.getFullYear() &&
+      curDate.getMonth() === realToday.getMonth() &&
+      curDate.getDate() === realToday.getDate();
 
     const dayId = DAY_IDS[i];
     const yyyy = curDate.getFullYear();
@@ -88,6 +104,7 @@ export function getWeekDays(referenceDate: Date = BASE_TODAY, weekOffset: number
       monthName: MONTH_NAMES[curDate.getMonth()],
       dayNumber: curDate.getDate(),
       year: curDate.getFullYear(),
+      fullDateStr: `${FULL_DAY_NAMES[i]}, ${MONTH_NAMES[curDate.getMonth()]} ${curDate.getDate()}`,
       isToday,
       color: DAY_COLORS[dayId],
     });
@@ -150,6 +167,7 @@ export function getMonthGrid(year: number, month: number): {
 
   const days: MonthGridDay[] = [];
 
+  const realToday = getRealToday();
   // Previous month padding days
   for (let i = mondayOffset; i > 0; i--) {
     const d = new Date(year, month, 1 - i);
@@ -165,9 +183,9 @@ export function getMonthGrid(year: number, month: number): {
       dayNumber: d.getDate(),
       isCurrentMonth: false,
       isToday:
-        d.getFullYear() === BASE_TODAY.getFullYear() &&
-        d.getMonth() === BASE_TODAY.getMonth() &&
-        d.getDate() === BASE_TODAY.getDate(),
+        d.getFullYear() === realToday.getFullYear() &&
+        d.getMonth() === realToday.getMonth() &&
+        d.getDate() === realToday.getDate(),
       dayId,
       color: DAY_COLORS[dayId],
     });
@@ -188,9 +206,9 @@ export function getMonthGrid(year: number, month: number): {
       dayNumber: i,
       isCurrentMonth: true,
       isToday:
-        d.getFullYear() === BASE_TODAY.getFullYear() &&
-        d.getMonth() === BASE_TODAY.getMonth() &&
-        d.getDate() === BASE_TODAY.getDate(),
+        d.getFullYear() === realToday.getFullYear() &&
+        d.getMonth() === realToday.getMonth() &&
+        d.getDate() === realToday.getDate(),
       dayId,
       color: DAY_COLORS[dayId],
     });
@@ -212,9 +230,9 @@ export function getMonthGrid(year: number, month: number): {
       dayNumber: d.getDate(),
       isCurrentMonth: false,
       isToday:
-        d.getFullYear() === BASE_TODAY.getFullYear() &&
-        d.getMonth() === BASE_TODAY.getMonth() &&
-        d.getDate() === BASE_TODAY.getDate(),
+        d.getFullYear() === realToday.getFullYear() &&
+        d.getMonth() === realToday.getMonth() &&
+        d.getDate() === realToday.getDate(),
       dayId,
       color: DAY_COLORS[dayId],
     });

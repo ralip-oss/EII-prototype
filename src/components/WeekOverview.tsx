@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DayId, Task } from '../types';
+import { DayId, Task, HabitStick } from '../types';
 import {
   CalendarDay,
   HALF_HOUR_SLOTS,
@@ -8,6 +8,7 @@ import {
   durationToMinutes,
   getTaskColor,
   getMonthGrid,
+  getTodayDayId,
 } from '../utils/dateUtils';
 import { EditTaskModal } from './EditTaskModal';
 import { zenAudio } from '../utils/audio';
@@ -19,9 +20,11 @@ interface WeekOverviewProps {
   onDeleteTask: (taskId: string) => void;
   onSelectDay: (dayId: DayId, dateKey?: string) => void;
   onOpenAddTask: (defaultDay?: DayId) => void;
+  onOpenAiBatch?: () => void;
   weekDays: CalendarDay[];
   anchorIntention: string;
   onUpdateAnchorIntention: (val: string) => void;
+  habitSticks?: HabitStick[];
 }
 
 const SLOT_HEIGHT = 28; // 28px per 30-min slot (1 hour = 56px)
@@ -33,9 +36,11 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
   onDeleteTask,
   onSelectDay,
   onOpenAddTask,
+  onOpenAiBatch,
   weekDays,
   anchorIntention,
   onUpdateAnchorIntention,
+  habitSticks = [],
 }) => {
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -118,6 +123,7 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
       time: slot,
       endTime: newEndTime,
     };
+
     onUpdateTask(updated);
   };
 
@@ -162,9 +168,22 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
           <div className="flex items-center gap-2 bg-[#f0eee9] dark:bg-[#1a1b1e] px-3.5 py-1.5 rounded-full border border-black/[0.03] dark:border-white/[0.04]">
             <div className="w-2 h-2 rounded-full bg-[#006b5e] dark:bg-[#8df1de] animate-pulse"></div>
             <span className="text-xs font-medium text-[#1b1c19] dark:text-[#e4e2dd]">
-              {completedTasks} of {totalTasks} focus blocks complete
+              {completedTasks} of {totalTasks} activities complete
             </span>
           </div>
+
+          {/* AI Batch Scheduling CTA (secondary button accent 2e4faa) */}
+          {onOpenAiBatch && (
+            <button
+              type="button"
+              onClick={onOpenAiBatch}
+              title="Batch Add Activities with AI Scheduler"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#2e4faa] dark:text-[#7d9eff] bg-[#2e4faa]/10 dark:bg-[#2e4faa]/20 hover:bg-[#2e4faa]/20 transition-all border border-[#2e4faa]/30 shadow-xs cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
+              <span>Batch AI</span>
+            </button>
+          )}
 
           {/* Interchangeable button: Week | Month */}
           <div className="flex items-center p-1 bg-[#eae8e3] dark:bg-[#25262c] rounded-full border border-black/[0.04] dark:border-white/[0.04]">
@@ -194,278 +213,268 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
         </div>
       </div>
 
-      {/* VIEW MODE: WEEK (Time on Left Side, 30m intervals 00:00 to 23:30, Hour lines through all days, flush blocks) */}
+      {/* VIEW MODE: WEEK (Solid Non-Transparent Left Time Column, 30m intervals 00:00 to 23:30, No right time column, Monday scrolls naturally) */}
       {viewMode === 'week' && (
-        <div className="w-full overflow-x-auto pb-4 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-none">
-          {/* Unified Full Week Box */}
-          <div className="min-w-[1020px] lg:min-w-0 w-full bg-white dark:bg-[#18191d] rounded-2xl border border-black/[0.08] dark:border-white/[0.1] shadow-[0_4px_24px_-2px_rgba(26,26,26,0.04)] overflow-hidden flex flex-col">
-            {/* Top Bar of the Box: Days Header (Days on top bar: Monday, Oct 12 | Tuesday, Oct 13 | ...) */}
-            <div className="grid grid-cols-[76px_repeat(7,1fr)] border-b border-black/[0.08] dark:border-white/[0.1] bg-[#fbf9f4] dark:bg-[#141518] sticky top-0 z-20">
-              {/* Left Column: Time Header */}
-              <div className="p-3 flex items-center justify-center font-headline font-semibold text-xs text-[#444748] dark:text-[#a1a1aa] uppercase tracking-wider border-r border-black/[0.08] dark:border-white/[0.1] bg-[#f5f3ee] dark:bg-[#1b1c20]">
-                Time
-              </div>
+        <div
+          ref={scheduleScrollRef}
+          className="w-full max-h-[680px] overflow-auto scrollbar-none rounded-2xl border border-black/[0.08] dark:border-white/[0.1] shadow-[0_4px_24px_-2px_rgba(26,26,26,0.04)] bg-white dark:bg-[#18191d] flex flex-col relative"
+        >
+          {/* Top Bar of the Box: Days Header (Time | Monday | Tuesday | ... | Sunday) */}
+          <div className="grid grid-cols-[76px_repeat(7,minmax(150px,1fr))] min-w-[1126px] border-b border-black/[0.08] dark:border-white/[0.1] bg-[#fbf9f4] dark:bg-[#141518] sticky top-0 z-40">
+            {/* Left Column: Time Header (sticky left-0) */}
+            <div className="sticky left-0 z-50 p-3 flex items-center justify-center font-headline font-semibold text-xs text-[#444748] dark:text-[#a1a1aa] uppercase tracking-wider border-r border-black/[0.08] dark:border-white/[0.1] bg-[#f5f3ee] dark:bg-[#1b1c20]">
+              Time
+            </div>
 
-              {/* 7 Days of the Week: Clean, neutral without day-color coding */}
-              {weekDays.map((day, idx) => {
-                const dayTasks = tasks.filter(
-                  (t) => t.dateKey === day.dateKey || (!t.dateKey && t.dayId === day.dayId)
-                );
-                const doneCount = dayTasks.filter((t) => t.completed).length;
+            {/* 7 Days of the Week: Monday is NOT sticky, scrolls naturally */}
+            {weekDays.map((day, idx) => {
+              const dayTasks = tasks.filter(
+                (t) => t.dateKey === day.dateKey || (!t.dateKey && t.dayId === day.dayId)
+              );
+              const doneCount = dayTasks.filter((t) => t.completed).length;
 
-                return (
-                  <div
-                    key={day.dayId}
-                    onClick={() => onSelectDay(day.dayId, day.dateKey)}
-                    className={`relative p-3 flex flex-col justify-between gap-1 cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors ${
-                      idx < 6 ? 'border-r border-black/[0.08] dark:border-white/[0.1]' : ''
-                    } ${day.isToday ? 'bg-[#006b5e]/[0.04] dark:bg-[#8df1de]/[0.04]' : ''}`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      {/* Responsive format: "Monday, Oct 12" / "Mon, Oct 12" if cropped */}
-                      <span className="font-headline font-semibold text-xs sm:text-sm text-[#1b1c19] dark:text-[#f2f0ea] truncate">
-                        <span className="hidden xl:inline">{day.dayName}</span>
-                        <span className="xl:hidden">{day.shortName}</span>, {day.monthName} {day.dayNumber}
+              return (
+                <div
+                  key={day.dayId}
+                  onClick={() => onSelectDay(day.dayId, day.dateKey)}
+                  className={`relative p-3 flex flex-col justify-between gap-1 cursor-pointer hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors border-r border-black/[0.08] dark:border-white/[0.1] z-30 bg-[#fbf9f4] dark:bg-[#141518] ${
+                    day.isToday ? 'bg-[#006b5e]/[0.05] dark:bg-[#8df1de]/[0.05]' : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-headline font-semibold text-xs sm:text-sm text-[#1b1c19] dark:text-[#f2f0ea] truncate">
+                      <span className="hidden xl:inline">{day.dayName}</span>
+                      <span className="xl:hidden">{day.shortName}</span>, {day.monthName} {day.dayNumber}
+                    </span>
+
+                    <span className="text-[10px] font-mono text-[#444748] dark:text-[#a1a1aa] shrink-0">
+                      {doneCount}/{dayTasks.length}
+                    </span>
+                  </div>
+
+                  {/* Today Badge */}
+                  {day.isToday ? (
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#006b5e] opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#006b5e]"></span>
                       </span>
-
-                      <span className="text-[10px] font-mono text-[#444748] dark:text-[#a1a1aa] shrink-0">
-                        {doneCount}/{dayTasks.length}
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#006b5e] dark:text-[#8df1de]">
+                        Today
                       </span>
                     </div>
+                  ) : (
+                    <span className="text-[10px] text-[#444748]/70 dark:text-[#a1a1aa]/70 font-mono">
+                      {day.shortName}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-                    {/* Today Badge */}
-                    {day.isToday ? (
-                      <div className="flex items-center gap-1.5 pt-0.5">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#006b5e] opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#006b5e]"></span>
-                        </span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#006b5e] dark:text-[#8df1de]">
-                          Today
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-[10px] text-[#444748]/70 dark:text-[#a1a1aa]/70 font-mono">
-                        {day.shortName}
-                      </span>
-                    )}
+          {/* Schedule Grid: 00:00 to 23:30 (48 slots) */}
+          <div
+            className="grid grid-cols-[76px_repeat(7,minmax(150px,1fr))] min-w-[1126px] relative"
+            style={{ height: `${HALF_HOUR_SLOTS.length * SLOT_HEIGHT}px` }}
+          >
+            {/* Left Side: Time Column - 100% Solid Non-Transparent throughout all slots */}
+            <div className="sticky left-0 z-30 border-r border-black/[0.08] dark:border-white/[0.1] bg-[#fbf9f4] dark:bg-[#141518] select-none shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)]">
+              {HALF_HOUR_SLOTS.map((slot, index) => {
+                const isHour = slot.endsWith(':00');
+                return (
+                  <div
+                    key={`l-${slot}`}
+                    style={{
+                      top: `${index * SLOT_HEIGHT}px`,
+                      height: `${SLOT_HEIGHT}px`,
+                    }}
+                    className={`absolute left-0 right-0 flex items-center justify-end pr-2.5 font-mono bg-[#fbf9f4] dark:bg-[#141518] ${
+                      isHour
+                        ? 'border-b border-black/[0.14] dark:border-white/[0.16] text-xs font-semibold text-[#1b1c19] dark:text-[#f2f0ea]'
+                        : 'border-b border-dashed border-black/[0.06] dark:border-white/[0.08] text-[10px] text-[#747878] dark:text-[#a1a1aa]'
+                    }`}
+                  >
+                    <span>{slot}</span>
                   </div>
                 );
               })}
             </div>
 
-            {/* Scrollable Schedule Grid: 00:00 to 23:30 (48 slots) */}
-            <div
-              ref={scheduleScrollRef}
-              className="relative max-h-[660px] overflow-y-auto scrollbar-none"
-            >
-              <div
-                className="grid grid-cols-[76px_repeat(7,1fr)] relative"
-                style={{ height: `${HALF_HOUR_SLOTS.length * SLOT_HEIGHT}px` }}
-              >
-                {/* Left Side: Time Column (00:00 to 23:30 in 30-min intervals) */}
-                <div className="relative border-r border-black/[0.08] dark:border-white/[0.1] bg-[#fbf9f4]/80 dark:bg-[#141518]/80 select-none">
-                  {HALF_HOUR_SLOTS.map((slot, index) => {
+            {/* 7 Day Columns with Continuous Horizontal Lines Every Hour & Flush Activity Blocks */}
+            {weekDays.map((day) => {
+              const dayTasks = tasks.filter(
+                (t) => t.dateKey === day.dateKey || (!t.dateKey && t.dayId === day.dayId)
+              );
+
+              return (
+                <div
+                  key={day.dayId}
+                  className={`relative border-r border-black/[0.08] dark:border-white/[0.1] bg-white dark:bg-[#18191d] ${
+                    day.isToday ? 'bg-[#006b5e]/[0.02]' : ''
+                  }`}
+                >
+                  {/* Background Grid Lines across the day column */}
+                  {HALF_HOUR_SLOTS.map((slot, slotIndex) => {
                     const isHour = slot.endsWith(':00');
+                    const isTarget =
+                      dragOverTarget?.dayId === day.dayId && dragOverTarget?.slot === slot;
+
                     return (
                       <div
                         key={slot}
+                        onDragOver={(e) => handleDragOverSlot(e, day.dayId, slot)}
+                        onDrop={(e) => handleDropOnSlot(e, day, slot)}
                         style={{
-                          top: `${index * SLOT_HEIGHT}px`,
+                          top: `${slotIndex * SLOT_HEIGHT}px`,
                           height: `${SLOT_HEIGHT}px`,
                         }}
-                        className={`absolute left-0 right-0 flex items-center justify-end pr-2.5 font-mono ${
+                        className={`absolute left-0 right-0 transition-colors ${
                           isHour
-                            ? 'border-b border-black/[0.14] dark:border-white/[0.16] text-xs font-semibold text-[#1b1c19] dark:text-[#f2f0ea]'
-                            : 'border-b border-dashed border-black/[0.06] dark:border-white/[0.08] text-[10px] text-[#747878] dark:text-[#a1a1aa]'
+                            ? 'border-b border-black/[0.14] dark:border-white/[0.16]'
+                            : 'border-b border-dashed border-black/[0.06] dark:border-white/[0.08]'
+                        } ${
+                          isTarget
+                            ? 'bg-[#2e4faa]/25 ring-2 ring-inset ring-[#2e4faa] z-20'
+                            : 'hover:bg-black/[0.015] dark:hover:bg-white/[0.015]'
                         }`}
                       >
-                        <span>{slot}</span>
+                        {isTarget && (
+                          <div className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold text-[#2e4faa] dark:text-[#7d9eff]">
+                            Drop at {slot}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Positioned Activity Blocks Touching Column Sides, Tops, and Bottoms */}
+                  {dayTasks.map((task) => {
+                    const startMin = timeToMinutes(task.time || '09:00');
+                    const durMin = durationToMinutes(task.duration, task.time, task.endTime);
+                    const topPx = (startMin / 30) * SLOT_HEIGHT;
+                    const heightPx = Math.max(SLOT_HEIGHT, (durMin / 30) * SLOT_HEIGHT);
+                    const taskColor = getTaskColor(task.title, task.color);
+                    const isDraggingCurrent = draggedTaskId === task.id;
+
+                    return (
+                      <div
+                        key={task.id}
+                        draggable={!task.locked}
+                        onDragStart={(e) => handleDragStart(e, task)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => onSelectDay(day.dayId, day.dateKey)}
+                        style={{
+                          top: `${topPx}px`,
+                          height: `${heightPx}px`,
+                        }}
+                        className={`absolute left-0 right-0 w-full group/task cursor-pointer transition-shadow z-10 px-2 py-1.5 flex flex-col justify-between overflow-hidden border-b border-black/[0.12] dark:border-white/[0.15] bg-white dark:bg-[#1e1f24] hover:shadow-lg hover:z-30 select-none ${
+                          draggedTaskId ? (isDraggingCurrent ? 'opacity-40 scale-98' : 'pointer-events-none') : ''
+                        } ${
+                          task.locked
+                            ? 'cursor-default ring-1 ring-black/10 dark:ring-white/10'
+                            : 'cursor-grab active:cursor-grabbing'
+                        } ${task.completed ? 'opacity-70' : ''}`}
+                      >
+                        {/* Color highlight bar at the TOP of the box (touching both sides) */}
+                        <div
+                          className="absolute top-0 left-0 right-0 h-1.5 transition-colors z-10"
+                          style={{ backgroundColor: taskColor }}
+                        />
+
+                        {/* Activity Content Header */}
+                        <div className="flex items-start justify-between gap-1 pt-1 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {/* Checkbox */}
+                            <button
+                              type="button"
+                              onClick={(e) => handleCheckboxClick(task.id, e)}
+                              className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                                task.completed
+                                  ? 'text-white'
+                                  : 'border-[1.5px] border-[#747878] group-hover/task:border-current'
+                              }`}
+                              style={task.completed ? { backgroundColor: taskColor } : {}}
+                            >
+                              {task.completed && (
+                                <span className="material-symbols-outlined text-[10px] font-bold">
+                                  check
+                                </span>
+                              )}
+                            </button>
+
+                            <span
+                              className={`text-xs font-semibold truncate ${
+                                task.completed
+                                  ? 'line-through text-[#444748] dark:text-[#71717a]'
+                                  : 'text-[#1b1c19] dark:text-white'
+                              }`}
+                            >
+                              {task.title}
+                            </span>
+
+                            {/* Locked subtle badge if activity is locked */}
+                            {task.locked && (
+                              <span
+                                className="material-symbols-outlined text-[13px] text-[#2e4faa] dark:text-[#7d9eff] shrink-0 opacity-80"
+                                title="Locked in place"
+                              >
+                                lock
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Hover Action Icons:
+                              1. Lock icon (shows closed lock if locked, open lock if unlocked)
+                              2. Three dots icon (opens Edit / Remove activity modal) */}
+                          <div className="opacity-0 group-hover/task:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity bg-white/95 dark:bg-[#1e1f24]/95 p-0.5 rounded-md shadow-sm border border-black/[0.06] dark:border-white/[0.08] z-20">
+                            {/* Lock Toggle Icon */}
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleLock(e, task)}
+                              title={task.locked ? 'Activity Locked (click to unlock)' : 'Activity Unlocked (click to lock in place)'}
+                              className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                                task.locked
+                                  ? 'text-[#2e4faa] dark:text-[#7d9eff] hover:bg-black/[0.06]'
+                                  : 'text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white hover:bg-black/[0.06]'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[15px]">
+                                {task.locked ? 'lock' : 'lock_open'}
+                              </span>
+                            </button>
+
+                            {/* Three dots (Edit / Remove) */}
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenEdit(e, task)}
+                              title="Edit or Remove activity"
+                              className="w-5 h-5 rounded flex items-center justify-center text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white hover:bg-black/[0.06] transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">
+                                more_horiz
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Activity Footer: Time Range & Details */}
+                        <div className="flex items-center justify-between text-[10px] font-mono text-[#444748] dark:text-[#a1a1aa] pt-0.5">
+                          <span>
+                            {task.time} – {task.endTime || minutesToTime(startMin + durMin)}
+                          </span>
+                          {task.category && (
+                            <span className="px-1 py-0.2 rounded bg-black/[0.04] dark:bg-white/[0.06] text-[9px] font-semibold uppercase tracking-wider">
+                              {task.category}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-
-                {/* 7 Day Columns with Continuous Horizontal Lines Every Hour & Flush Task Blocks */}
-                {weekDays.map((day, colIdx) => {
-                  const dayTasks = tasks.filter(
-                    (t) => t.dateKey === day.dateKey || (!t.dateKey && t.dayId === day.dayId)
-                  );
-
-                  return (
-                    <div
-                      key={day.dayId}
-                      className={`relative ${
-                        colIdx < 6 ? 'border-r border-black/[0.08] dark:border-white/[0.1]' : ''
-                      } ${day.isToday ? 'bg-[#006b5e]/[0.015]' : ''}`}
-                    >
-                      {/* Background Grid Lines across the day column:
-                          - Solid line every hour (:00)
-                          - Subtle dashed line every half-hour (:30)
-                          - Interactive drop targets for dragging tasks */}
-                      {HALF_HOUR_SLOTS.map((slot, slotIndex) => {
-                        const isHour = slot.endsWith(':00');
-                        const isTarget =
-                          dragOverTarget?.dayId === day.dayId && dragOverTarget?.slot === slot;
-
-                        return (
-                          <div
-                            key={slot}
-                            onDragOver={(e) => handleDragOverSlot(e, day.dayId, slot)}
-                            onDrop={(e) => handleDropOnSlot(e, day, slot)}
-                            style={{
-                              top: `${slotIndex * SLOT_HEIGHT}px`,
-                              height: `${SLOT_HEIGHT}px`,
-                            }}
-                            className={`absolute left-0 right-0 transition-colors ${
-                              isHour
-                                ? 'border-b border-black/[0.14] dark:border-white/[0.16]'
-                                : 'border-b border-dashed border-black/[0.06] dark:border-white/[0.08]'
-                            } ${
-                              isTarget
-                                ? 'bg-[#006b5e]/25 ring-2 ring-inset ring-[#006b5e] z-20'
-                                : 'hover:bg-black/[0.015] dark:hover:bg-white/[0.015]'
-                            }`}
-                          >
-                            {isTarget && (
-                              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold text-[#006b5e] dark:text-[#8df1de]">
-                                Drop at {slot}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-
-                      {/* Positioned Task Blocks Touching Column Sides, Tops, and Bottoms */}
-                      {dayTasks.map((task) => {
-                        const startMin = timeToMinutes(task.time || '09:00');
-                        const durMin = durationToMinutes(task.duration, task.time, task.endTime);
-                        const topPx = (startMin / 30) * SLOT_HEIGHT;
-                        const heightPx = Math.max(SLOT_HEIGHT, (durMin / 30) * SLOT_HEIGHT);
-                        // Tasks with the same name (case-insensitive) share the same color
-                        const taskColor = getTaskColor(task.title, task.color);
-                        const isDraggingCurrent = draggedTaskId === task.id;
-
-                        return (
-                          <div
-                            key={task.id}
-                            draggable={!task.locked}
-                            onDragStart={(e) => handleDragStart(e, task)}
-                            onDragEnd={handleDragEnd}
-                            onClick={() => onSelectDay(day.dayId, day.dateKey)}
-                            style={{
-                              top: `${topPx}px`,
-                              height: `${heightPx}px`,
-                            }}
-                            className={`absolute left-0 right-0 w-full group/task cursor-pointer transition-shadow z-10 px-2 py-1.5 flex flex-col justify-between overflow-hidden border-b border-black/[0.12] dark:border-white/[0.15] bg-white dark:bg-[#1e1f24] hover:shadow-lg hover:z-30 select-none ${
-                              draggedTaskId ? (isDraggingCurrent ? 'opacity-40 scale-98' : 'pointer-events-none') : ''
-                            } ${
-                              task.locked
-                                ? 'cursor-default ring-1 ring-black/10 dark:ring-white/10'
-                                : 'cursor-grab active:cursor-grabbing'
-                            } ${task.completed ? 'opacity-70' : ''}`}
-                          >
-                            {/* Color highlight bar at the TOP of the box (touching both sides) */}
-                            <div
-                              className="absolute top-0 left-0 right-0 h-1.5 transition-colors z-10"
-                              style={{ backgroundColor: taskColor }}
-                            />
-
-                            {/* Task Content Header */}
-                            <div className="flex items-start justify-between gap-1 pt-1 min-w-0">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                {/* Checkbox */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleCheckboxClick(task.id, e)}
-                                  className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                                    task.completed
-                                      ? 'text-white'
-                                      : 'border-[1.5px] border-[#747878] group-hover/task:border-current'
-                                  }`}
-                                  style={task.completed ? { backgroundColor: taskColor } : {}}
-                                >
-                                  {task.completed && (
-                                    <span className="material-symbols-outlined text-[10px] font-bold">
-                                      check
-                                    </span>
-                                  )}
-                                </button>
-
-                                <span
-                                  className={`text-xs font-semibold truncate ${
-                                    task.completed
-                                      ? 'line-through text-[#444748] dark:text-[#71717a]'
-                                      : 'text-[#1b1c19] dark:text-white'
-                                  }`}
-                                >
-                                  {task.title}
-                                </span>
-
-                                {/* Locked subtle badge if task is locked */}
-                                {task.locked && (
-                                  <span
-                                    className="material-symbols-outlined text-[13px] text-[#006b5e] dark:text-[#8df1de] shrink-0 opacity-80"
-                                    title="Locked in place"
-                                  >
-                                    lock
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Hover Action Icons:
-                                  1. Lock icon (shows closed lock if locked, open lock if unlocked)
-                                  2. Three dots icon (opens Edit / Remove task modal) */}
-                              <div className="opacity-0 group-hover/task:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity bg-white/95 dark:bg-[#1e1f24]/95 p-0.5 rounded-md shadow-sm border border-black/[0.06] dark:border-white/[0.08] z-20">
-                                {/* Lock Toggle Icon */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleToggleLock(e, task)}
-                                  title={task.locked ? 'Task Locked (click to unlock)' : 'Task Unlocked (click to lock in place)'}
-                                  className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
-                                    task.locked
-                                      ? 'text-[#006b5e] dark:text-[#8df1de] hover:bg-black/[0.06]'
-                                      : 'text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white hover:bg-black/[0.06]'
-                                  }`}
-                                >
-                                  <span className="material-symbols-outlined text-[15px]">
-                                    {task.locked ? 'lock' : 'lock_open'}
-                                  </span>
-                                </button>
-
-                                {/* Three dots (Edit / Remove) */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleOpenEdit(e, task)}
-                                  title="Edit or Remove task"
-                                  className="w-5 h-5 rounded flex items-center justify-center text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white hover:bg-black/[0.06] transition-colors"
-                                >
-                                  <span className="material-symbols-outlined text-[16px]">
-                                    more_horiz
-                                  </span>
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Task Footer: Time Range & Details */}
-                            <div className="flex items-center justify-between text-[10px] font-mono text-[#444748] dark:text-[#a1a1aa] pt-0.5">
-                              <span>
-                                {task.time} – {task.endTime || minutesToTime(startMin + durMin)}
-                              </span>
-                              {task.category && (
-                                <span className="px-1 py-0.2 rounded bg-black/[0.04] dark:bg-white/[0.06] text-[9px] font-semibold uppercase tracking-wider">
-                                  {task.category}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -480,7 +489,7 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
                 {monthData.monthName} {monthData.year}
               </span>
               <span className="text-xs text-[#444748] dark:text-[#a1a1aa] font-medium">
-                {tasks.length} tasks scheduled this period
+                {tasks.length} activities scheduled this period
               </span>
             </div>
 
@@ -607,6 +616,156 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Stickies Today Overview (View-Only Snapshot under Calendar) */}
+      {(() => {
+        const todayDayId = getTodayDayId();
+        const doneHabitsToday = habitSticks.filter((h) => h.completedDays?.[todayDayId]);
+        const remainingHabitsToday = habitSticks.filter((h) => !h.completedDays?.[todayDayId]);
+        const totalHabits = habitSticks.length;
+        const doneHabitsCount = doneHabitsToday.length;
+        const remainingHabitsCount = remainingHabitsToday.length;
+        const habitsProgressPct = totalHabits > 0 ? Math.round((doneHabitsCount / totalHabits) * 100) : 0;
+        const todayCalDay = weekDays.find((d) => d.dayId === todayDayId) || weekDays[0];
+        const todayLabel = todayCalDay?.fullDateStr || 'Today';
+
+        return (
+          <div className="w-full mt-6 bg-white dark:bg-[#18191d] rounded-2xl border border-black/[0.06] dark:border-white/[0.08] p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-black/[0.05] dark:border-white/[0.06]">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#2e4faa]/10 text-[#2e4faa] dark:text-[#7d9eff] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">sticky_note_2</span>
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="font-headline font-semibold text-sm sm:text-base text-[#1b1c19] dark:text-white">
+                      Stickies Daily Overview
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[10px] font-mono uppercase tracking-wider text-[#747878] dark:text-[#a1a1aa]">
+                      View Only
+                    </span>
+                  </div>
+                  <span className="text-xs text-[#747878] dark:text-[#a1a1aa]">
+                    Status for {todayLabel} • {doneHabitsCount} of {totalHabits} completed ({habitsProgressPct}%)
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Bar & Status pill */}
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xs font-mono font-semibold text-[#1b1c19] dark:text-white">
+                    {habitsProgressPct}% towards 100%
+                  </span>
+                  <div className="w-36 h-2 rounded-full bg-black/[0.06] dark:bg-white/[0.08] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 bg-[#2e4faa]"
+                      style={{ width: `${habitsProgressPct}%` }}
+                    />
+                  </div>
+                </div>
+                {habitsProgressPct === 100 && totalHabits > 0 && (
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">done_all</span>
+                    100% Done
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Content Lists */}
+            {totalHabits === 0 ? (
+              <div className="py-4 text-center text-xs text-[#747878] dark:text-[#a1a1aa] italic">
+                No stickies defined yet. Click "Stickies" in the top bar to track habits.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                {/* Completed Column */}
+                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-[#fbf9f4] dark:bg-[#151619] border border-black/[0.04] dark:border-white/[0.05]">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[#1b1c19] dark:text-white">
+                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                      Completed Today ({doneHabitsCount})
+                    </span>
+                    <span className="text-[11px] font-mono text-[#747878] dark:text-[#a1a1aa]">
+                      {doneHabitsCount}/{totalHabits}
+                    </span>
+                  </div>
+                  {doneHabitsCount === 0 ? (
+                    <p className="text-xs text-[#747878] dark:text-[#a1a1aa] italic py-2">
+                      No stickies completed yet today.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-1.5 mt-1">
+                      {doneHabitsToday.map((h) => (
+                        <div
+                          key={h.id}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-[#202126] border border-black/[0.03] dark:border-white/[0.04] text-xs"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: h.color }}
+                            />
+                            <span className="font-medium text-[#1b1c19] dark:text-white truncate line-through opacity-80">
+                              {h.title}
+                            </span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-semibold uppercase tracking-wider shrink-0">
+                            Done
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Remaining to reach 100% Column */}
+                <div className="flex flex-col gap-2 p-3.5 rounded-xl bg-[#fbf9f4] dark:bg-[#151619] border border-black/[0.04] dark:border-white/[0.05]">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[#1b1c19] dark:text-white">
+                    <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                      <span className="material-symbols-outlined text-[16px]">pending</span>
+                      Left to reach 100% ({remainingHabitsCount})
+                    </span>
+                    <span className="text-[11px] font-mono text-[#747878] dark:text-[#a1a1aa]">
+                      {remainingHabitsCount} left
+                    </span>
+                  </div>
+                  {remainingHabitsCount === 0 ? (
+                    <div className="flex items-center gap-2 py-3 px-2 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                      <span className="material-symbols-outlined text-[18px]">verified</span>
+                      <span>All stickies finished for today! 100% achievement reached.</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5 mt-1">
+                      {remainingHabitsToday.map((h) => (
+                        <div
+                          key={h.id}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-[#202126] border border-black/[0.03] dark:border-white/[0.04] text-xs"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: h.color }}
+                            />
+                            <span className="font-medium text-[#1b1c19] dark:text-white truncate">
+                              {h.title}
+                            </span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-semibold uppercase tracking-wider shrink-0">
+                            Remaining
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Anchor Intention Card */}
       <div className="w-full mt-6 bg-white dark:bg-[#18191d] rounded-2xl border border-black/[0.06] dark:border-white/[0.08] p-5 sm:p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

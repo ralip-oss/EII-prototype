@@ -4,8 +4,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-headline: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-headline: "Black Ops One", cursive, sans-serif;
+  --font-body: "Redaction", Georgia, serif, sans-serif;
   
   --color-surface: #fbf9f4;
   --color-surface-dim: #dbdad5;

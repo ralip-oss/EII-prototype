@@ -46,7 +46,7 @@ export const WeeklyReview: React.FC<WeeklyReviewProps> = ({ weekDays }) => {
     zenAudio.playChime();
     setTimeout(() => {
       setIsRollingAll(false);
-      setRollSuccessMessage('All tasks gently scheduled for Next Monday');
+      setRollSuccessMessage('All activities gently scheduled for Next Monday');
       setTimeout(() => {
         setRolloverTasks([]);
       }, 700);
@@ -78,7 +78,7 @@ export const WeeklyReview: React.FC<WeeklyReviewProps> = ({ weekDays }) => {
 
   const handleArchiveSummary = () => {
     const summary = `Weekly Review Summary (${rangeLabel})
-- 24 of 28 tasks completed (86%)
+- 24 of 28 activities completed (86%)
 - Pacing: Optimal Flow
 - Consistency: 92% Steady
 - Busiest Day: Wednesday (6 blocks, 5.5h)
@@ -116,7 +116,7 @@ export const WeeklyReview: React.FC<WeeklyReviewProps> = ({ weekDays }) => {
           </h1>
           <p className="text-base text-[#444748] dark:text-[#a1a1aa]">
             {rangeLabel} <span className="mx-2 opacity-40">/</span>
-            <span className="text-[#1b1c19] dark:text-white font-semibold"> 24 of 28 tasks completed </span>
+            <span className="text-[#1b1c19] dark:text-white font-semibold"> 24 of 28 activities completed </span>
             <span className="text-[#006b5e] dark:text-[#8df1de] font-semibold">(86%)</span>
           </p>
         </div>
@@ -408,7 +408,7 @@ export const WeeklyReview: React.FC<WeeklyReviewProps> = ({ weekDays }) => {
                     </>
                   ) : (
                     <>
-                      <span>Roll all {rolloverTasks.length} tasks to Next Monday</span>
+                      <span>Roll all {rolloverTasks.length} activities to Next Monday</span>
                       <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                     </>
                   )}

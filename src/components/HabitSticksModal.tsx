@@ -207,7 +207,7 @@ export const HabitSticksModal: React.FC<HabitSticksModalProps> = ({
             </div>
             <button
               type="submit"
-              className="py-2 bg-[#006b5e] text-white rounded-xl text-xs font-semibold hover:opacity-90 transition-opacity"
+              className="py-2 bg-[#2e4faa] hover:bg-[#25418f] text-white rounded-xl text-xs font-semibold transition-opacity"
             >
               Add Stick
             </button>

@@ -143,7 +143,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
               id="edit-task-title"
               className="font-headline font-semibold text-lg sm:text-xl text-[#1b1c19] dark:text-white"
             >
-              Edit Task
+              Edit Activity
             </h2>
           </div>
           <button
@@ -160,7 +160,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
           {/* 1. Name */}
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-semibold uppercase tracking-wider text-[#444748] dark:text-[#a1a1aa]">
-              Task Name
+              Activity Name
             </label>
             <input
               type="text"
@@ -177,7 +177,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
               autoFocus
             />
             <span className="text-[10px] text-[#444748] dark:text-[#a1a1aa]">
-              Tasks with the same name (case-insensitive) share the same color.
+              Activities with the same name (case-insensitive) share the same color.
             </span>
           </div>
 
@@ -185,7 +185,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-semibold uppercase tracking-wider text-[#444748] dark:text-[#a1a1aa]">
-                Task Color
+                Activity Color
               </label>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-[#444748] dark:text-[#a1a1aa]">{color}</span>
@@ -358,12 +358,12 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
               </span>
               <div className="flex flex-col">
                 <span className="text-xs font-semibold text-[#1b1c19] dark:text-white">
-                  Lock Task in Place
+                  Lock Activity in Place
                 </span>
                 <span className="text-[10px] text-[#444748] dark:text-[#a1a1aa]">
                   {isLocked
-                    ? 'Task is locked: cannot be moved via drag and drop'
-                    : 'Task is unlocked: can be freely dragged around the week'}
+                    ? 'Activity is locked: cannot be moved via drag and drop'
+                    : 'Activity is unlocked: can be freely dragged around the week'}
                 </span>
               </div>
             </div>
@@ -374,14 +374,14 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
               aria-checked={isLocked}
               onClick={() => setIsLocked(!isLocked)}
               className={`w-10 h-6 rounded-full p-0.5 flex items-center transition-colors cursor-pointer ${
-                isLocked ? 'bg-[#006b5e] justify-end' : 'bg-[#e4e2dd] dark:bg-[#2e3036] justify-start'
+                isLocked ? 'bg-[#2e4faa] justify-end' : 'bg-[#e4e2dd] dark:bg-[#2e3036] justify-start'
               }`}
             >
               <span className="w-5 h-5 rounded-full bg-white shadow-xs"></span>
             </button>
           </div>
 
-          {/* Bottom Actions: Remove Task & Save */}
+          {/* Bottom Actions: Remove Activity & Save */}
           <div className="flex items-center justify-between pt-2 border-t border-black/[0.04] dark:border-white/[0.04]">
             <button
               type="button"
@@ -389,7 +389,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
               className="px-3.5 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-[16px]">delete</span>
-              <span>Remove Task</span>
+              <span>Remove Activity</span>
             </button>
 
             <div className="flex items-center gap-2">

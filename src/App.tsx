@@ -6,6 +6,8 @@ import {
 } from './data/initialData';
 import {
   BASE_TODAY,
+  getRealToday,
+  getTodayDayId,
   getWeekDays,
   formatWeekRange,
   getTaskColor,
@@ -15,6 +17,7 @@ import { WeekOverview } from './components/WeekOverview';
 import { DayDetail } from './components/DayDetail';
 import { WeeklyReview } from './components/WeeklyReview';
 import { AddTaskModal } from './components/AddTaskModal';
+import { AiBatchScheduleModal } from './components/AiBatchScheduleModal';
 import { HabitSticksModal } from './components/HabitSticksModal';
 import { ZenFocusTimer } from './components/ZenFocusTimer';
 import { SettingsModal } from './components/SettingsModal';
@@ -25,12 +28,13 @@ export default function App() {
   const [currentView, setCurrentView] = useState<
     'week-overview' | 'day-detail' | 'weekly-review' | 'habits'
   >('week-overview');
-  // Today is Thursday Oct 15 in this calendar week
-  const [selectedDayId, setSelectedDayId] = useState<DayId>('thu');
+  // Real today automatically detected
+  const [selectedDayId, setSelectedDayId] = useState<DayId>(getTodayDayId());
 
   // Modals
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
-  const [addTaskDefaultDay, setAddTaskDefaultDay] = useState<DayId>('thu');
+  const [addTaskDefaultDay, setAddTaskDefaultDay] = useState<DayId>(getTodayDayId());
+  const [isAiBatchOpen, setIsAiBatchOpen] = useState(false);
   const [isFocusTimerOpen, setIsFocusTimerOpen] = useState(false);
   const [isHabitsModalOpen, setIsHabitsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -45,17 +49,17 @@ export default function App() {
     return false;
   });
 
-  // Week offset (0 = current week Oct 12 – 18, 2026)
+  // Week offset (0 = current week based on real today)
   const [weekOffset, setWeekOffset] = useState(0);
 
   // Real calendar days for the active week
   const weekDays = getWeekDays(BASE_TODAY, weekOffset);
   const weekRangeText = formatWeekRange(weekDays);
 
-  // Task & Habit State
+  // Activity & Habit State
   const [tasks, setTasks] = useState<Task[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('weekly_tasks_v3');
+      const saved = localStorage.getItem('weekly_activities_v6');
       if (saved) {
         try {
           return JSON.parse(saved);
@@ -64,7 +68,7 @@ export default function App() {
         }
       }
     }
-    return INITIAL_TASKS;
+    return [];
   });
 
   const [habitSticks, setHabitSticks] = useState<HabitStick[]>(() => {
@@ -100,9 +104,9 @@ export default function App() {
     }
   }, [isDark]);
 
-  // Sync Tasks to LocalStorage
+  // Sync Activities to LocalStorage
   useEffect(() => {
-    localStorage.setItem('weekly_tasks_v3', JSON.stringify(tasks));
+    localStorage.setItem('weekly_activities_v6', JSON.stringify(tasks));
   }, [tasks]);
 
   // Sync Habit Sticks to LocalStorage
@@ -268,14 +272,33 @@ export default function App() {
     setHabitSticks((prev) => [...prev, newStick]);
   };
 
+  const handleBatchAddActivities = (newActivities: Task[]) => {
+    setTasks((prev) => {
+      const updated = [...prev];
+      newActivities.forEach((newAct) => {
+        const normTitle = newAct.title.trim().toLowerCase();
+        const existingSameTitle = updated.find(
+          (t) => t.title.trim().toLowerCase() === normTitle
+        );
+        const color =
+          existingSameTitle?.color || newAct.color || getTaskColor(newAct.title);
+        updated.push({
+          ...newAct,
+          color,
+        });
+      });
+      return updated;
+    });
+  };
+
   const handleResetData = () => {
-    setTasks(INITIAL_TASKS);
+    setTasks([]);
     setHabitSticks(INITIAL_HABIT_STICKS);
     setAnchorIntention(
       'Protect mid-morning hours for uninterrupted architectural decisions. Let Thursday research inform the sprint launch without rushing.'
     );
     setWeekOffset(0);
-    localStorage.removeItem('weekly_tasks_v3');
+    localStorage.removeItem('weekly_activities_v6');
     localStorage.removeItem('weekly_habits_v3');
     localStorage.removeItem('weekly_anchor_intention_v3');
   };
@@ -293,7 +316,9 @@ export default function App() {
           }
         }}
         onOpenAddTask={() => handleOpenAddTask()}
+        onOpenAiBatch={() => setIsAiBatchOpen(true)}
         onOpenFocusTimer={() => setIsFocusTimerOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         isDark={isDark}
         onToggleTheme={handleToggleTheme}
         weekRangeText={weekRangeText}
@@ -301,7 +326,7 @@ export default function App() {
         onNextWeek={() => setWeekOffset((prev) => prev + 1)}
         onResetToday={() => {
           setWeekOffset(0);
-          setSelectedDayId('thu');
+          setSelectedDayId(getTodayDayId());
         }}
       />
 
@@ -315,9 +340,11 @@ export default function App() {
             onDeleteTask={handleDeleteTask}
             onSelectDay={handleSelectDay}
             onOpenAddTask={handleOpenAddTask}
+            onOpenAiBatch={() => setIsAiBatchOpen(true)}
             weekDays={weekDays}
             anchorIntention={anchorIntention}
             onUpdateAnchorIntention={setAnchorIntention}
+            habitSticks={habitSticks}
           />
         )}
 
@@ -411,18 +438,23 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenHabits={() => setIsHabitsModalOpen(true)}
-        onOpenFocus={() => setIsFocusTimerOpen(true)}
-      />
+      <Footer />
 
-      {/* Add Task Modal */}
+      {/* Add Activity Modal */}
       <AddTaskModal
         isOpen={isAddTaskOpen}
         onClose={() => setIsAddTaskOpen(false)}
         onAddTask={handleAddTask}
         defaultDayId={addTaskDefaultDay}
+        weekDays={weekDays}
+      />
+
+      {/* AI Batch Scheduling Modal */}
+      <AiBatchScheduleModal
+        isOpen={isAiBatchOpen}
+        onClose={() => setIsAiBatchOpen(false)}
+        onAddBatchActivities={handleBatchAddActivities}
+        existingActivities={tasks}
         weekDays={weekDays}
       />
 

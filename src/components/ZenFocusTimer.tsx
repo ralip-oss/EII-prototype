@@ -195,7 +195,7 @@ export const ZenFocusTimer: React.FC<ZenFocusTimerProps> = ({ isOpen, onClose })
                 onClick={() => handleSoundChange(snd.id as typeof soundscape)}
                 className={`py-2 px-1.5 rounded-lg text-[11px] font-medium flex flex-col items-center gap-1 transition-all ${
                   soundscape === snd.id
-                    ? 'bg-white dark:bg-[#282a30] text-[#006b5e] dark:text-[#8df1de] font-semibold shadow-xs'
+                    ? 'bg-white dark:bg-[#282a30] text-[#2e4faa] dark:text-[#7d9eff] font-semibold shadow-xs'
                     : 'text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white'
                 }`}
               >

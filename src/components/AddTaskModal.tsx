@@ -105,7 +105,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
               id="modal-title"
               className="font-headline font-semibold text-xl tracking-tight text-[#1b1c19] dark:text-white"
             >
-              New Task
+              New Activity
             </h2>
           </div>
           <button
@@ -122,7 +122,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
           {/* Title Input */}
           <div className="relative group">
             <label className="sr-only" htmlFor="taskTitle">
-              Task Title
+              Activity Title
             </label>
             <input
               id="taskTitle"
@@ -156,7 +156,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                     onClick={() => setSelectedDayId(d.dayId)}
                     className={`group flex flex-col items-center justify-center py-2.5 rounded-xl transition-all ${
                       isSelected
-                        ? 'bg-[#006b5e] text-white shadow-xs'
+                        ? 'bg-[#2e4faa] text-white shadow-xs'
                         : 'bg-[#f5f3ee] dark:bg-[#212328] hover:bg-[#eae8e3] dark:hover:bg-[#2a2c33] text-[#1b1c19] dark:text-white'
                     }`}
                   >
@@ -379,7 +379,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                 onClick={() => setIsRepeat(!isRepeat)}
                 className={`hidden sm:flex items-center gap-1 px-3 py-2 text-xs font-semibold rounded-xl transition-colors ${
                   isRepeat
-                    ? 'bg-[#006b5e]/15 text-[#006b5e] dark:text-[#8df1de]'
+                    ? 'bg-[#2e4faa]/15 text-[#2e4faa] dark:text-[#7d9eff]'
                     : 'bg-[#f5f3ee] dark:bg-[#212328] text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white'
                 }`}
               >
@@ -395,7 +395,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                 <span className="material-symbols-outlined text-[18px]">
                   {isSubmitted ? 'done_all' : 'check'}
                 </span>
-                <span>{isSubmitted ? 'Saved' : 'Create Task'}</span>
+                <span>{isSubmitted ? 'Saved' : 'Create Activity'}</span>
               </button>
             </div>
           </div>
