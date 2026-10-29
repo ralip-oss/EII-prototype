@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/* Crucial: Configure Tailwind v4 to use class-based dark mode instead of prefers-color-scheme */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-headline: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  
+  --color-surface: #fbf9f4;
+  --color-surface-dim: #dbdad5;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f5f3ee;
+  --color-surface-container: #f0eee9;
+  --color-surface-container-high: #eae8e3;
+  --color-surface-container-highest: #e4e2dd;
+  --color-on-surface: #1b1c19;
+  --color-on-surface-variant: #444748;
+  --color-secondary: #006b5e;
+  --color-secondary-container: #8df1de;
+  --color-on-secondary-container: #006f62;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-body);
+  }
+
+  /* Space Grotesk for headings */
+  h1, h2, h3, h4, .font-headline {
+    font-family: var(--font-headline);
+  }
+}
+
+/* Custom scrollbar hiding for clean zen aesthetic */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

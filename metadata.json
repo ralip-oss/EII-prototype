@@ -1,0 +1,8 @@
+{
+  "name": "Weekly — Intentional Weekly Pacing & Habit Flow",
+  "description": "A weekly planner, rhythmic pacing engine, and tactile habit tracker for calm, focused productivity.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
