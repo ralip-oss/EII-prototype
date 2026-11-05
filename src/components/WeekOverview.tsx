@@ -21,6 +21,8 @@ interface WeekOverviewProps {
   onSelectDay: (dayId: DayId, dateKey?: string) => void;
   onOpenAddTask: (defaultDay?: DayId) => void;
   onOpenAiBatch?: () => void;
+  onOpenUploadSchedule?: () => void;
+  onRemoveAllBatchActivities?: () => void;
   weekDays: CalendarDay[];
   anchorIntention: string;
   onUpdateAnchorIntention: (val: string) => void;
@@ -37,6 +39,8 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
   onSelectDay,
   onOpenAddTask,
   onOpenAiBatch,
+  onOpenUploadSchedule,
+  onRemoveAllBatchActivities,
   weekDays,
   anchorIntention,
   onUpdateAnchorIntention,
@@ -47,6 +51,28 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEditingIntention, setIsEditingIntention] = useState(false);
   const [tempIntention, setTempIntention] = useState(anchorIntention);
+  const [showBatchAiDropdown, setShowBatchAiDropdown] = useState(false);
+
+  // Real-time current time tracker for the horizontal red line
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000); // 30-sec updates
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentHours = currentTime.getHours();
+  const currentMinutes = currentTime.getMinutes();
+  const totalMinutesToday = currentHours * 60 + currentMinutes;
+  const nowTopPx = (totalMinutesToday / 30) * SLOT_HEIGHT;
+  const currentTimeFormatted = `${String(currentHours).padStart(2, '0')}:${String(currentMinutes).padStart(2, '0')}`;
+  const todayIndex = weekDays.findIndex((d) => d.isToday);
+
+  useEffect(() => {
+    setTempIntention(anchorIntention);
+  }, [anchorIntention]);
 
   // Drag and drop state
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -73,6 +99,7 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
   // Overall stats
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.completed).length;
+  const batchAiTasks = tasks.filter((t) => t.isBatchAi);
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, task: Task) => {
@@ -165,25 +192,103 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
 
         {/* Pacing status & Interchangeable Week | Month Toggle */}
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Upload Schedule from Image Button */}
+          {onOpenUploadSchedule && (
+            <button
+              type="button"
+              onClick={onOpenUploadSchedule}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#2e4faa] dark:text-[#7d9eff] bg-[#2e4faa]/10 dark:bg-[#2e4faa]/20 hover:bg-[#2e4faa]/20 border border-[#2e4faa]/25 transition-all shadow-xs cursor-pointer"
+              title="Upload Schedule from image or timetable"
+            >
+              <span className="material-symbols-outlined text-[15px]">photo_camera</span>
+              <span className="hidden sm:inline">Upload Schedule</span>
+            </button>
+          )}
+
+          {/* Quick Batch AI Activities Management Pill - Only reveals Remove All after pressing the button */}
+          {batchAiTasks.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowBatchAiDropdown(!showBatchAiDropdown)}
+                className="flex items-center gap-1.5 bg-[#2e4faa]/10 dark:bg-[#2e4faa]/20 hover:bg-[#2e4faa]/20 text-[#2e4faa] dark:text-[#7d9eff] border border-[#2e4faa]/30 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                title="Manage AI activities"
+              >
+                <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
+                <span>{batchAiTasks.length} AI activities</span>
+                <span className="material-symbols-outlined text-[15px]">
+                  {showBatchAiDropdown ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
+
+              {/* Popover listing all Batch AI activities with Remove All option (shown ONLY after clicking button) */}
+              {showBatchAiDropdown && (
+                <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-[#1a1b1e] rounded-xl shadow-[0_12px_32px_rgba(0,0,0,0.18)] border border-black/[0.08] dark:border-white/[0.1] p-3 z-50 flex flex-col gap-2 animate-fadeIn">
+                  <div className="flex items-center justify-between pb-2 border-b border-black/[0.05] dark:border-white/[0.06] px-0.5">
+                    <span className="text-xs font-bold text-[#1b1c19] dark:text-white">
+                      AI Activities ({batchAiTasks.length})
+                    </span>
+                    {onRemoveAllBatchActivities && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Remove all ${batchAiTasks.length} batch AI activities from your schedule?`)) {
+                            onRemoveAllBatchActivities();
+                            setShowBatchAiDropdown(false);
+                            zenAudio.playChime();
+                          }
+                        }}
+                        className="text-xs text-red-500 hover:text-red-700 font-bold hover:underline flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
+                        <span>Remove All</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-56 overflow-y-auto flex flex-col gap-1">
+                    {batchAiTasks.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-1.5 rounded-lg bg-[#fbf9f4] dark:bg-[#22242a] flex items-center justify-between text-xs hover:bg-[#f0eee9] dark:hover:bg-[#2a2d34] transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: t.color || getTaskColor(t.title) }}
+                          />
+                          <span className="font-semibold text-[#1b1c19] dark:text-white truncate text-[11px]">
+                            {t.title}
+                          </span>
+                          <span className="text-[10px] text-[#747878] dark:text-[#a1a1aa] font-mono shrink-0">
+                            {t.dayId.toUpperCase()} {t.time}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onDeleteTask(t.id);
+                            zenAudio.playChime();
+                          }}
+                          className="p-1 text-red-500 hover:bg-red-500/15 rounded transition-colors shrink-0"
+                          title="Remove this activity"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">delete</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-2 bg-[#f0eee9] dark:bg-[#1a1b1e] px-3.5 py-1.5 rounded-full border border-black/[0.03] dark:border-white/[0.04]">
             <div className="w-2 h-2 rounded-full bg-[#006b5e] dark:bg-[#8df1de] animate-pulse"></div>
             <span className="text-xs font-medium text-[#1b1c19] dark:text-[#e4e2dd]">
               {completedTasks} of {totalTasks} activities complete
             </span>
           </div>
-
-          {/* AI Batch Scheduling CTA (secondary button accent 2e4faa) */}
-          {onOpenAiBatch && (
-            <button
-              type="button"
-              onClick={onOpenAiBatch}
-              title="Batch Add Activities with AI Scheduler"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#2e4faa] dark:text-[#7d9eff] bg-[#2e4faa]/10 dark:bg-[#2e4faa]/20 hover:bg-[#2e4faa]/20 transition-all border border-[#2e4faa]/30 shadow-xs cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
-              <span>Batch AI</span>
-            </button>
-          )}
 
           {/* Interchangeable button: Week | Month */}
           <div className="flex items-center p-1 bg-[#eae8e3] dark:bg-[#25262c] rounded-full border border-black/[0.04] dark:border-white/[0.04]">
@@ -242,7 +347,7 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
                   }`}
                 >
                   <div className="flex items-center justify-between gap-1">
-                    <span className="font-headline font-semibold text-xs sm:text-sm text-[#1b1c19] dark:text-[#f2f0ea] truncate">
+                    <span className="font-serif font-normal text-xs sm:text-sm text-[#1b1c19] dark:text-[#f2f0ea] truncate">
                       <span className="hidden xl:inline">{day.dayName}</span>
                       <span className="xl:hidden">{day.shortName}</span>, {day.monthName} {day.dayNumber}
                     </span>
@@ -278,8 +383,22 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
             className="grid grid-cols-[76px_repeat(7,minmax(150px,1fr))] min-w-[1126px] relative"
             style={{ height: `${HALF_HOUR_SLOTS.length * SLOT_HEIGHT}px` }}
           >
-            {/* Left Side: Time Column - 100% Solid Non-Transparent throughout all slots */}
-            <div className="sticky left-0 z-30 border-r border-black/[0.08] dark:border-white/[0.1] bg-[#fbf9f4] dark:bg-[#141518] select-none shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)]">
+            {/* Left Side: Time Column - 100% Solid Non-Transparent throughout all slots and spans full height */}
+            <div
+              style={{ height: `${HALF_HOUR_SLOTS.length * SLOT_HEIGHT}px` }}
+              className="sticky left-0 z-30 h-full border-r border-black/[0.12] dark:border-white/[0.14] bg-[#fbf9f4] dark:bg-[#141518] select-none shadow-[2px_0_8px_-2px_rgba(0,0,0,0.08)]"
+            >
+              {/* Real-time Current Time Badge pinned to left time column at exact hour and minute */}
+              <div
+                style={{ top: `${nowTopPx}px` }}
+                className="absolute left-0 right-0 -translate-y-1/2 z-40 flex items-center justify-end pr-1.5 pointer-events-none"
+              >
+                <span className="font-mono font-bold text-[10px] text-white bg-red-600 rounded px-1.5 py-0.5 shadow-md flex items-center gap-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                  {currentTimeFormatted}
+                </span>
+              </div>
+
               {HALF_HOUR_SLOTS.map((slot, index) => {
                 const isHour = slot.endsWith(':00');
                 return (
@@ -301,7 +420,27 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
               })}
             </div>
 
-            {/* 7 Day Columns with Continuous Horizontal Lines Every Hour & Flush Activity Blocks */}
+            {/* Real-time Current Time Red Horizontal Line spanning across all 7 columns at exact time */}
+            <div
+              style={{ top: `${nowTopPx}px` }}
+              className="absolute left-[76px] right-0 h-[2px] bg-red-500 z-35 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.85)]"
+            >
+              {todayIndex >= 0 && (
+                <div
+                  style={{
+                    left: `calc(${((todayIndex + 0.5) / 7) * 100}%)`,
+                  }}
+                  className="absolute -top-[5px] -translate-x-1/2 flex items-center justify-center pointer-events-none"
+                >
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border border-white"></span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* 7 Day Columns with Continuous Full-Height Dividing Lines Every Hour & Flush Activity Blocks */}
             {weekDays.map((day) => {
               const dayTasks = tasks.filter(
                 (t) => t.dateKey === day.dateKey || (!t.dateKey && t.dayId === day.dayId)
@@ -310,7 +449,8 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
               return (
                 <div
                   key={day.dayId}
-                  className={`relative border-r border-black/[0.08] dark:border-white/[0.1] bg-white dark:bg-[#18191d] ${
+                  style={{ height: `${HALF_HOUR_SLOTS.length * SLOT_HEIGHT}px` }}
+                  className={`relative h-full border-r border-black/[0.12] dark:border-white/[0.14] bg-white dark:bg-[#18191d] ${
                     day.isToday ? 'bg-[#006b5e]/[0.02]' : ''
                   }`}
                 >
@@ -348,12 +488,12 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
                     );
                   })}
 
-                  {/* Positioned Activity Blocks Touching Column Sides, Tops, and Bottoms */}
+                  {/* Positioned Activity Blocks Touching Column Sides, Tops, and Bottoms (Supports <30m) */}
                   {dayTasks.map((task) => {
                     const startMin = timeToMinutes(task.time || '09:00');
                     const durMin = durationToMinutes(task.duration, task.time, task.endTime);
                     const topPx = (startMin / 30) * SLOT_HEIGHT;
-                    const heightPx = Math.max(SLOT_HEIGHT, (durMin / 30) * SLOT_HEIGHT);
+                    const heightPx = Math.max(16, (durMin / 30) * SLOT_HEIGHT);
                     const taskColor = getTaskColor(task.title, task.color);
                     const isDraggingCurrent = draggedTaskId === task.id;
 
@@ -413,6 +553,16 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
                               {task.title}
                             </span>
 
+                            {/* Batch AI sparkle indicator */}
+                            {task.isBatchAi && (
+                              <span
+                                className="material-symbols-outlined text-[12px] text-[#2e4faa] dark:text-[#7d9eff] shrink-0"
+                                title="Scheduled by Batch AI"
+                              >
+                                auto_awesome
+                              </span>
+                            )}
+
                             {/* Locked subtle badge if activity is locked */}
                             {task.locked && (
                               <span
@@ -426,7 +576,8 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
 
                           {/* Hover Action Icons:
                               1. Lock icon (shows closed lock if locked, open lock if unlocked)
-                              2. Three dots icon (opens Edit / Remove activity modal) */}
+                              2. Quick trash icon (for instant batch AI activity removal)
+                              3. Three dots icon (opens Edit / Remove activity modal) */}
                           <div className="opacity-0 group-hover/task:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity bg-white/95 dark:bg-[#1e1f24]/95 p-0.5 rounded-md shadow-sm border border-black/[0.06] dark:border-white/[0.08] z-20">
                             {/* Lock Toggle Icon */}
                             <button
@@ -443,6 +594,22 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
                                 {task.locked ? 'lock' : 'lock_open'}
                               </span>
                             </button>
+
+                            {/* Quick trash icon for batch AI activity */}
+                            {task.isBatchAi && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteTask(task.id);
+                                  zenAudio.playChime();
+                                }}
+                                title="Remove Batch AI activity"
+                                className="w-5 h-5 rounded flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-500/10 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                              </button>
+                            )}
 
                             {/* Three dots (Edit / Remove) */}
                             <button
@@ -485,7 +652,7 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
           {/* Month Header with Navigator */}
           <div className="flex items-center justify-between pb-3 border-b border-black/[0.05] dark:border-white/[0.06]">
             <div className="flex items-center gap-3">
-              <span className="font-headline font-semibold text-xl text-[#1b1c19] dark:text-white">
+              <span className="font-serif font-normal text-xl text-[#1b1c19] dark:text-white">
                 {monthData.monthName} {monthData.year}
               </span>
               <span className="text-xs text-[#444748] dark:text-[#a1a1aa] font-medium">
@@ -549,7 +716,7 @@ export const WeekOverview: React.FC<WeekOverviewProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <span
-                      className={`font-headline text-xs sm:text-sm font-semibold ${
+                      className={`font-serif text-xs sm:text-sm font-normal ${
                         mDay.isToday
                           ? 'text-[#006b5e] dark:text-[#8df1de] font-bold'
                           : 'text-[#1b1c19] dark:text-[#f2f0ea]'

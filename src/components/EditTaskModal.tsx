@@ -301,9 +301,13 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                   onChange={(e) => handleDurationPreset(e.target.value)}
                   className="w-full bg-white dark:bg-[#18191d] px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#1b1c19] dark:text-white border border-black/[0.05] dark:border-white/[0.06] focus:outline-none"
                 >
+                  {!['30m', '45m', '1h', '1h 15m', '1h 30m', '2h', '3h', '4h'].includes(duration) && (
+                    <option value={duration}>{duration} (Custom)</option>
+                  )}
                   <option value="30m">30 min</option>
                   <option value="45m">45 min</option>
                   <option value="1h">1 hour</option>
+                  <option value="1h 15m">1h 15m</option>
                   <option value="1h 30m">1h 30m</option>
                   <option value="2h">2 hours</option>
                   <option value="3h">3 hours</option>

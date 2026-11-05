@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Task, DayId } from '../types';
-import { CalendarDay, getTaskColor } from '../utils/dateUtils';
+import { CalendarDay, getTaskColor, getTodayDayId } from '../utils/dateUtils';
 import { zenAudio } from '../utils/audio';
 
 interface AiBatchScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddBatchActivities: (newActivities: Task[]) => void;
+  onDeleteTask?: (taskId: string) => void;
+  onRemoveAllBatchActivities?: () => void;
   existingActivities: Task[];
   weekDays: CalendarDay[];
 }
@@ -15,9 +17,10 @@ interface ActivityConfig {
   id: string;
   title: string;
   frequency: number; // e.g. 3
-  duration: string; // "1h", "45m", "1h 30m", or custom
-  customMinutes?: number; // min 30
+  duration: string; // "1h", "45m", "15m", or custom
+  customMinutes?: number; // min 5
   isCustomDuration?: boolean;
+  repeat?: 'once' | 'weekly' | 'monthly' | 'yearly';
   timePreference: 'anytime' | 'morning' | 'afternoon' | 'evening' | 'custom';
   earliestHour: string; // "08:00"
   latestHour: string; // "18:30"
@@ -28,6 +31,8 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
   isOpen,
   onClose,
   onAddBatchActivities,
+  onDeleteTask,
+  onRemoveAllBatchActivities,
   existingActivities,
   weekDays,
 }) => {
@@ -45,8 +50,26 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
 
   // User refinement changes box
   const [refinementText, setRefinementText] = useState('');
+  const [showActiveBatchList, setShowActiveBatchList] = useState(false);
 
-  if (!isOpen) return null;
+  // When opening batch AI again, always show the input page to add more activities
+  useEffect(() => {
+    if (isOpen) {
+      setStep('input');
+      setInputText('');
+      setActivities([]);
+      setProposedActivities([]);
+      setRefinementText('');
+      setErrorMsg('');
+      setExpandedActivities({});
+      setShowActiveBatchList(false);
+    }
+  }, [isOpen]);
+
+  const existingBatchActivities = useMemo(
+    () => existingActivities.filter((t) => t.isBatchAi),
+    [existingActivities]
+  );
 
   const handleAddActivityFromInput = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -93,6 +116,7 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
         duration: defaultDur,
         customMinutes: 60,
         isCustomDuration: false,
+        repeat: 'weekly',
         timePreference: defaultPref,
         earliestHour: earliest,
         latestHour: latest,
@@ -153,17 +177,28 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
     setErrorMsg('');
 
     try {
+      const todayId = getTodayDayId();
       const payload = {
+        currentDayId: todayId,
         activities: activities.map((a) => ({
           title: a.title,
           frequency: a.frequency,
           duration: a.isCustomDuration && a.customMinutes ? `${a.customMinutes}m` : a.duration,
-          timeConstraint:
-            a.timePreference === 'custom'
-              ? `${a.earliestHour} - ${a.latestHour}`
-              : a.timePreference,
-          earliestHour: a.timePreference === 'custom' ? a.earliestHour : undefined,
-          latestHour: a.timePreference === 'custom' ? a.latestHour : undefined,
+          repeat: a.repeat || 'weekly',
+          timeConstraint: a.timePreference,
+          timePreference: a.timePreference,
+          earliestHour:
+            a.timePreference === 'afternoon'
+              ? a.earliestHour || '12:00'
+              : a.timePreference === 'morning'
+              ? a.earliestHour || '00:00'
+              : a.earliestHour,
+          latestHour:
+            a.timePreference === 'afternoon'
+              ? a.latestHour || '23:30'
+              : a.timePreference === 'morning'
+              ? a.latestHour || '12:00'
+              : a.latestHour,
           description: a.description,
         })),
         existingActivities: existingActivities.map((t) => ({
@@ -217,17 +252,28 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
     setErrorMsg('');
 
     try {
+      const todayId = getTodayDayId();
       const payload = {
+        currentDayId: todayId,
         activities: activities.map((a) => ({
           title: a.title,
           frequency: a.frequency,
           duration: a.isCustomDuration && a.customMinutes ? `${a.customMinutes}m` : a.duration,
-          timeConstraint:
-            a.timePreference === 'custom'
-              ? `${a.earliestHour} - ${a.latestHour}`
-              : a.timePreference,
-          earliestHour: a.timePreference === 'custom' ? a.earliestHour : undefined,
-          latestHour: a.timePreference === 'custom' ? a.latestHour : undefined,
+          repeat: a.repeat || 'weekly',
+          timeConstraint: a.timePreference,
+          timePreference: a.timePreference,
+          earliestHour:
+            a.timePreference === 'afternoon'
+              ? a.earliestHour || '12:00'
+              : a.timePreference === 'morning'
+              ? a.earliestHour || '00:00'
+              : a.earliestHour,
+          latestHour:
+            a.timePreference === 'afternoon'
+              ? a.latestHour || '23:30'
+              : a.timePreference === 'morning'
+              ? a.latestHour || '12:00'
+              : a.latestHour,
           description: a.description,
         })),
         existingActivities: existingActivities.map((t) => ({
@@ -274,26 +320,53 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
     }
   };
 
+  const handleRemoveProposedSession = (index: number) => {
+    setProposedActivities((prev) => prev.filter((_, i) => i !== index));
+    zenAudio.playChime();
+  };
+
+  const handleRemoveProposedGroup = (groupKey: string) => {
+    setProposedActivities((prev) =>
+      prev.filter((act) => (act.title || '').trim().toLowerCase() !== groupKey)
+    );
+    zenAudio.playChime();
+  };
+
+  const handleDiscardAllProposed = () => {
+    setProposedActivities([]);
+    setStep('input');
+    zenAudio.playChime();
+  };
+
   const handleAcceptSchedule = () => {
-    const formattedNewActivities: Task[] = proposedActivities.map((act) => ({
-      id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      title: act.title,
-      color: getTaskColor(act.title),
-      dayId: act.dayId as DayId,
-      dateKey: act.dateKey,
-      time: act.time,
-      endTime: act.endTime,
-      duration: act.duration,
-      category: act.category || 'Focus',
-      completed: false,
-      status: 'todo',
-      notes: act.notes,
-    }));
+    const formattedNewActivities: Task[] = proposedActivities.map((act) => {
+      const matchingCfg = activities.find(
+        (a) => a.title.trim().toLowerCase() === (act.title || '').trim().toLowerCase()
+      );
+      return {
+        id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        title: act.title,
+        color: getTaskColor(act.title),
+        dayId: act.dayId as DayId,
+        dateKey: act.dateKey,
+        time: act.time,
+        endTime: act.endTime,
+        duration: act.duration,
+        repeat: act.repeat || matchingCfg?.repeat || 'weekly',
+        category: act.category || 'Focus',
+        completed: false,
+        status: 'todo' as const,
+        notes: act.notes,
+        isBatchAi: true,
+      };
+    });
 
     onAddBatchActivities(formattedNewActivities);
     zenAudio.playChime();
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-[12px] z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
@@ -340,6 +413,89 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
           {/* STEP 1: INPUT ACTIVITIES */}
           {step === 'input' && (
             <div className="flex flex-col gap-4">
+              {/* CURRENTLY SCHEDULED BATCH AI ACTIVITIES BANNER */}
+              {existingBatchActivities.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-[#2e4faa]/5 dark:bg-[#2e4faa]/10 border border-[#2e4faa]/20 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-[#2e4faa] dark:text-[#7d9eff]">
+                        auto_awesome
+                      </span>
+                      <span className="text-xs font-semibold text-[#1b1c19] dark:text-white">
+                        {existingBatchActivities.length} batch AI {existingBatchActivities.length === 1 ? 'activity' : 'activities'} on schedule
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowActiveBatchList(!showActiveBatchList)}
+                        className="text-xs text-[#2e4faa] dark:text-[#7d9eff] font-semibold hover:underline flex items-center gap-0.5"
+                      >
+                        <span>{showActiveBatchList ? 'Hide List' : 'View / Remove Individual'}</span>
+                        <span className="material-symbols-outlined text-[14px]">
+                          {showActiveBatchList ? 'expand_less' : 'expand_more'}
+                        </span>
+                      </button>
+
+                      {onRemoveAllBatchActivities && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm('Remove all batch AI activities from your schedule?')) {
+                              onRemoveAllBatchActivities();
+                              zenAudio.playChime();
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
+                          <span>Remove All</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expandable list of existing batch AI activities with individual delete */}
+                  {showActiveBatchList && (
+                    <div className="max-h-44 overflow-y-auto flex flex-col gap-1.5 pt-1 border-t border-[#2e4faa]/15">
+                      {existingBatchActivities.map((act) => (
+                        <div
+                          key={act.id}
+                          className="p-2 rounded-lg bg-white dark:bg-[#18191d] border border-black/[0.04] dark:border-white/[0.05] flex items-center justify-between text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: act.color || getTaskColor(act.title) }}
+                            />
+                            <span className="font-semibold text-[#1b1c19] dark:text-white truncate">
+                              {act.title}
+                            </span>
+                            <span className="text-[10px] text-[#747878] dark:text-[#a1a1aa] font-mono shrink-0">
+                              ({act.dayId.toUpperCase()} {act.time}–{act.endTime || ''})
+                            </span>
+                          </div>
+                          {onDeleteTask && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onDeleteTask(act.id);
+                                zenAudio.playChime();
+                              }}
+                              className="p-1 text-red-500 hover:bg-red-500/10 rounded transition-colors shrink-0"
+                              title="Remove individual activity"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">delete</span>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-[#1b1c19] dark:text-[#f2f0ea]">
                   What activities would you like to add?
@@ -427,8 +583,11 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
           {/* STEP 2: CONFIGURE FREQUENCY, CUSTOM DURATION & SPECIFIC HOURS */}
           {step === 'configure' && (
             <div className="flex flex-col gap-5">
-              <div className="bg-[#2e4faa]/10 p-3 rounded-xl border border-[#2e4faa]/20 text-xs text-[#2e4faa] dark:text-[#7d9eff]">
-                Specify frequency, duration (custom time supported with min 30m), and any time constraints.
+              <div className="bg-[#2e4faa]/10 p-3 rounded-xl border border-[#2e4faa]/20 text-xs text-[#2e4faa] dark:text-[#7d9eff] flex items-center justify-between">
+                <span>Activities are scheduled starting from today forward through the end of the week.</span>
+                <span className="font-semibold uppercase text-[10px] tracking-wider bg-[#2e4faa]/20 px-2 py-0.5 rounded">
+                  Today: {getTodayDayId().toUpperCase()}
+                </span>
               </div>
 
               <div className="flex flex-col gap-4">
@@ -482,67 +641,150 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Duration (Custom Support with Min 30m) */}
-                      <div className="flex flex-col gap-1">
+                      {/* Duration (Supports durations shorter than 30m, from 5m+) */}
+                      <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-semibold uppercase tracking-wider text-[#444748] dark:text-[#a1a1aa]">
                             Duration per session
                           </label>
                           <span className="text-[10px] text-[#747878] dark:text-[#a1a1aa]">
-                            Min: 30 min
+                            Custom (5m+)
                           </span>
                         </div>
-                        <div className="flex gap-2">
-                          <select
-                            value={act.isCustomDuration ? 'custom' : act.duration}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === 'custom') {
-                                handleUpdateConfig(act.id, {
-                                  isCustomDuration: true,
-                                  customMinutes: act.customMinutes || 45,
-                                  duration: `${act.customMinutes || 45}m`,
-                                });
-                              } else {
+
+                        {/* Presets and Set Custom Time buttons */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {['15m', '30m', '45m', '1h'].map((d) => (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => {
                                 handleUpdateConfig(act.id, {
                                   isCustomDuration: false,
-                                  duration: val,
+                                  duration: d,
                                 });
-                              }
+                              }}
+                              className={`flex-1 min-w-[46px] py-1 rounded-lg text-xs font-semibold transition-all ${
+                                !act.isCustomDuration && act.duration === d
+                                  ? 'bg-[#1b1c19] dark:bg-white text-white dark:text-[#1b1c19] shadow-xs'
+                                  : 'bg-white dark:bg-[#18191d] text-[#444748] dark:text-[#a1a1aa] border border-black/[0.04] dark:border-white/[0.05]'
+                              }`}
+                            >
+                              {d}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleUpdateConfig(act.id, {
+                                isCustomDuration: true,
+                                customMinutes: act.customMinutes || 20,
+                                duration: `${act.customMinutes || 20}m`,
+                              });
                             }}
-                            className="flex-1 bg-white dark:bg-[#18191d] px-3 py-1.5 rounded-lg text-xs font-semibold text-[#1b1c19] dark:text-white border border-black/[0.05] dark:border-white/[0.06] focus:outline-none"
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 shrink-0 ${
+                              act.isCustomDuration
+                                ? 'bg-[#2e4faa] text-white shadow-xs'
+                                : 'bg-white dark:bg-[#18191d] text-[#444748] dark:text-[#a1a1aa] border border-black/[0.04] dark:border-white/[0.05] hover:text-[#1b1c19] dark:hover:text-white'
+                            }`}
                           >
-                            <option value="30m">30 min (default min)</option>
-                            <option value="45m">45 min</option>
-                            <option value="1h">1 hour</option>
-                            <option value="1h 15m">1h 15m</option>
-                            <option value="1h 30m">1h 30m</option>
-                            <option value="2h">2 hours</option>
-                            <option value="custom">Custom minutes...</option>
-                          </select>
+                            <span className="material-symbols-outlined text-[13px]">tune</span>
+                            <span>Set Custom Time</span>
+                          </button>
+                        </div>
 
-                          {act.isCustomDuration && (
-                            <div className="flex items-center gap-1.5 shrink-0 bg-white dark:bg-[#18191d] px-2.5 py-1 rounded-lg border border-black/[0.05] dark:border-white/[0.06]">
-                              <input
-                                type="number"
-                                min={30}
-                                step={5}
-                                value={act.customMinutes || 30}
-                                onChange={(e) => {
-                                  const num = Math.max(30, parseInt(e.target.value, 10) || 30);
-                                  handleUpdateConfig(act.id, {
-                                    customMinutes: num,
-                                    duration: `${num}m`,
-                                  });
-                                }}
-                                className="w-14 bg-[#f5f3ee] dark:bg-[#25262c] px-1.5 py-0.5 rounded text-xs font-mono font-semibold text-center"
-                              />
-                              <span className="text-[10px] text-[#747878] dark:text-[#a1a1aa] font-medium">
-                                min
+                        {/* Custom Time Details when Set Custom Time is active */}
+                        {act.isCustomDuration && (
+                          <div className="p-2.5 rounded-lg bg-white dark:bg-[#18191d] border border-black/[0.05] dark:border-white/[0.06] flex flex-col gap-2 animate-fadeIn">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-[11px] font-semibold text-[#1b1c19] dark:text-white flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px] text-[#2e4faa]">timer</span>
+                                Custom Duration:
+                              </span>
+                              <span className="font-mono text-xs font-bold text-[#2e4faa] dark:text-[#7d9eff]">
+                                {act.customMinutes || 15} min ({Math.floor((act.customMinutes || 15) / 60) > 0 ? `${Math.floor((act.customMinutes || 15) / 60)}h ` : ''}{(act.customMinutes || 15) % 60 > 0 ? `${(act.customMinutes || 15) % 60}m` : ''})
                               </span>
                             </div>
-                          )}
-                        </div>
+
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 flex-1 bg-[#f5f3ee] dark:bg-[#25262c] px-2.5 py-1 rounded-md">
+                                <span className="text-[11px] text-[#444748] dark:text-[#a1a1aa] font-medium">Minutes:</span>
+                                <input
+                                  type="number"
+                                  min={5}
+                                  max={480}
+                                  step={5}
+                                  value={act.customMinutes || 15}
+                                  onChange={(e) => {
+                                    const num = Math.max(5, parseInt(e.target.value, 10) || 5);
+                                    handleUpdateConfig(act.id, {
+                                      customMinutes: num,
+                                      duration: `${num}m`,
+                                    });
+                                  }}
+                                  className="w-full bg-transparent text-xs font-mono font-semibold text-center focus:outline-none"
+                                />
+                              </div>
+
+                              {/* Steppers */}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = act.customMinutes || 15;
+                                    const next = Math.max(5, current - 5);
+                                    handleUpdateConfig(act.id, {
+                                      customMinutes: next,
+                                      duration: `${next}m`,
+                                    });
+                                  }}
+                                  className="px-2 h-7 rounded bg-[#f5f3ee] dark:bg-[#25262c] flex items-center justify-center text-xs font-bold text-[#444748] dark:text-[#a1a1aa] hover:bg-black/[0.08]"
+                                  title="-5 min"
+                                >
+                                  -5m
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = act.customMinutes || 15;
+                                    const next = current + 5;
+                                    handleUpdateConfig(act.id, {
+                                      customMinutes: next,
+                                      duration: `${next}m`,
+                                    });
+                                  }}
+                                  className="px-2 h-7 rounded bg-[#f5f3ee] dark:bg-[#25262c] flex items-center justify-center text-xs font-bold text-[#444748] dark:text-[#a1a1aa] hover:bg-black/[0.08]"
+                                  title="+5 min"
+                                >
+                                  +5m
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Preset chips including short durations */}
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {[10, 15, 20, 25, 30, 45, 60, 90].map((mins) => (
+                                <button
+                                  key={mins}
+                                  type="button"
+                                  onClick={() => {
+                                    handleUpdateConfig(act.id, {
+                                      customMinutes: mins,
+                                      duration: `${mins}m`,
+                                    });
+                                  }}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold transition-all ${
+                                    (act.customMinutes || 15) === mins
+                                      ? 'bg-[#2e4faa] text-white'
+                                      : 'bg-[#f5f3ee] dark:bg-[#25262c] text-[#444748] dark:text-[#a1a1aa]'
+                                  }`}
+                                >
+                                  {mins}m
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -556,7 +798,23 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
                           <button
                             key={pref}
                             type="button"
-                            onClick={() => handleUpdateConfig(act.id, { timePreference: pref })}
+                            onClick={() => {
+                              if (pref === 'afternoon') {
+                                handleUpdateConfig(act.id, {
+                                  timePreference: 'afternoon',
+                                  earliestHour: '12:00',
+                                  latestHour: '23:30',
+                                });
+                              } else if (pref === 'morning') {
+                                handleUpdateConfig(act.id, {
+                                  timePreference: 'morning',
+                                  earliestHour: '00:00',
+                                  latestHour: '12:00',
+                                });
+                              } else {
+                                handleUpdateConfig(act.id, { timePreference: pref });
+                              }
+                            }}
                             className={`py-1 rounded-lg text-xs font-semibold capitalize transition-all ${
                               act.timePreference === pref
                                 ? 'bg-[#1b1c19] dark:bg-white text-white dark:text-[#1b1c19] shadow-xs'
@@ -568,9 +826,47 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
                         ))}
                       </div>
 
+                      {/* Afternoon strict window display */}
+                      {act.timePreference === 'afternoon' && (
+                        <div className="flex items-center justify-between text-[11px] px-3 py-2 rounded-lg bg-white dark:bg-[#18191d] border border-black/[0.04] dark:border-white/[0.05] text-[#444748] dark:text-[#a1a1aa] animate-fadeIn">
+                          <span className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-[#2e4faa]">wb_twilight</span>
+                            <span>Afternoon: strictly after 12:00 ({act.earliestHour || '12:00'} – {act.latestHour || '23:30'})</span>
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px]">End by:</span>
+                            <input
+                              type="time"
+                              value={act.latestHour || '23:30'}
+                              onChange={(e) => handleUpdateConfig(act.id, { latestHour: e.target.value })}
+                              className="bg-[#f5f3ee] dark:bg-[#25262c] px-2 py-0.5 rounded text-[11px] font-mono font-semibold"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Morning window display */}
+                      {act.timePreference === 'morning' && (
+                        <div className="flex items-center justify-between text-[11px] px-3 py-2 rounded-lg bg-white dark:bg-[#18191d] border border-black/[0.04] dark:border-white/[0.05] text-[#444748] dark:text-[#a1a1aa] animate-fadeIn">
+                          <span className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-amber-500">wb_sunny</span>
+                            <span>Morning: between 00:00 – 12:00</span>
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px]">Start after:</span>
+                            <input
+                              type="time"
+                              value={act.earliestHour || '08:00'}
+                              onChange={(e) => handleUpdateConfig(act.id, { earliestHour: e.target.value })}
+                              className="bg-[#f5f3ee] dark:bg-[#25262c] px-2 py-0.5 rounded text-[11px] font-mono font-semibold"
+                            />
+                          </div>
+                        </div>
+                      )}
+
                       {/* Custom Hours Input */}
                       {act.timePreference === 'custom' && (
-                        <div className="flex items-center gap-2 mt-1 p-2 bg-white dark:bg-[#18191d] rounded-lg border border-black/[0.04] dark:border-white/[0.05]">
+                        <div className="flex items-center gap-2 mt-1 p-2 bg-white dark:bg-[#18191d] rounded-lg border border-black/[0.04] dark:border-white/[0.05] animate-fadeIn">
                           <span className="text-[11px] text-[#444748] dark:text-[#a1a1aa]">Between:</span>
                           <input
                             type="time"
@@ -589,6 +885,34 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
                           />
                         </div>
                       )}
+                    </div>
+
+                    {/* Repeat Cadence Selector */}
+                    <div className="flex flex-col gap-1 pt-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-semibold uppercase tracking-wider text-[#444748] dark:text-[#a1a1aa]">
+                          Repeat
+                        </label>
+                        <span className="text-[10px] text-[#747878] dark:text-[#a1a1aa]">
+                          Recurring frequency
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {(['once', 'weekly', 'monthly', 'yearly'] as const).map((rep) => (
+                          <button
+                            key={rep}
+                            type="button"
+                            onClick={() => handleUpdateConfig(act.id, { repeat: rep })}
+                            className={`py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${
+                              (act.repeat || 'weekly') === rep
+                                ? 'bg-[#2e4faa] text-white shadow-xs'
+                                : 'bg-white dark:bg-[#18191d] text-[#444748] dark:text-[#a1a1aa] border border-black/[0.04] dark:border-white/[0.05] hover:text-[#1b1c19] dark:hover:text-white'
+                            }`}
+                          >
+                            {rep}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Description Text Box for AI */}
@@ -705,13 +1029,18 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
 
               {/* ARRANGED ACTIVITIES: GROUPED ACCORDION VIEW */}
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <span className="text-xs font-semibold text-[#1b1c19] dark:text-white">
-                    Arranged Activities ({groupedProposedActivities.length} unique activities)
+                    Arranged Activities ({groupedProposedActivities.length} unique activities, {proposedActivities.length} sessions)
                   </span>
-                  <span className="text-[11px] text-[#747878] dark:text-[#a1a1aa]">
-                    Click any activity to view dates & times
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDiscardAllProposed}
+                    className="text-xs text-red-500 hover:text-red-600 font-semibold hover:underline flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
+                    <span>Remove All Proposed</span>
+                  </button>
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -745,6 +1074,17 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
                           </div>
 
                           <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveProposedGroup(group.key);
+                              }}
+                              className="text-xs text-red-500 hover:text-red-600 font-semibold px-2 py-1 rounded hover:bg-red-500/10 transition-colors"
+                              title="Remove all sessions of this activity"
+                            >
+                              Remove
+                            </button>
                             <span className="px-2 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[10px] font-mono text-[#444748] dark:text-[#a1a1aa]">
                               {isExpanded ? 'Hide schedule' : 'View schedule'}
                             </span>
@@ -782,9 +1122,22 @@ export const AiBatchScheduleModal: React.FC<AiBatchScheduleModalProps> = ({
                                         {session.time} – {session.endTime}
                                       </span>
                                     </div>
-                                    <span className="px-2 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.06] text-[10px] font-mono text-[#444748] dark:text-[#d1d5db]">
-                                      {session.duration}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="px-2 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.06] text-[10px] font-mono text-[#444748] dark:text-[#d1d5db]">
+                                        {session.duration}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const actualIdx = proposedActivities.findIndex((p) => p === session);
+                                          if (actualIdx !== -1) handleRemoveProposedSession(actualIdx);
+                                        }}
+                                        className="p-1 text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                                        title="Remove this session"
+                                      >
+                                        <span className="material-symbols-outlined text-[15px]">delete</span>
+                                      </button>
+                                    </div>
                                   </div>
                                 );
                               })}

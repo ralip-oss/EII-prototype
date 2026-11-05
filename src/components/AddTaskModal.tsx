@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DayId, Task } from '../types';
-import { CalendarDay } from '../utils/dateUtils';
+import { CalendarDay, timeToMinutes, minutesToTime, durationToMinutes } from '../utils/dateUtils';
 import { zenAudio } from '../utils/audio';
 
 interface AddTaskModalProps {
@@ -18,14 +18,15 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
   defaultDayId = 'thu',
   weekDays,
 }) => {
-  const [title, setTitle] = useState('Refine quarterly architectural roadmap');
+  const [title, setTitle] = useState('');
   const [selectedDayId, setSelectedDayId] = useState<DayId>(defaultDayId);
   const [startTime, setStartTime] = useState('14:00');
   const [duration, setDuration] = useState('1h');
+  const [isCustomDuration, setIsCustomDuration] = useState(false);
+  const [customHours, setCustomHours] = useState(1);
+  const [customMinutes, setCustomMinutes] = useState(0);
   const [category, setCategory] = useState('Focus');
-  const [notes, setNotes] = useState(
-    'Draft system specs for weekly recurring events. Consolidate review criteria with engineering lead.'
-  );
+  const [notes, setNotes] = useState('');
   const [hasReminder, setHasReminder] = useState(true);
   const [isRepeat, setIsRepeat] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -45,10 +46,14 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
     }
   }, [defaultDayId, isOpen]);
 
-  if (!isOpen) return null;
-
   const selectedDayConfig =
     weekDays.find((d) => d.dayId === selectedDayId) || weekDays[3] || weekDays[0];
+
+  const calculatedEndTime = useMemo(() => {
+    const startMins = timeToMinutes(startTime);
+    const durMins = durationToMinutes(duration);
+    return minutesToTime(startMins + durMins);
+  }, [startTime, duration]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +69,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
         dateKey: selectedDayConfig?.dateKey,
         time: startTime || '12:00',
         duration,
+        endTime: calculatedEndTime,
         category,
         notes,
         quietReminder: hasReminder,
@@ -84,6 +90,22 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
       setShowAddTag(false);
     }
   };
+
+  const updateCustomDuration = (hours: number, minutes: number) => {
+    setCustomHours(hours);
+    setCustomMinutes(minutes);
+    let str = '';
+    if (hours > 0 && minutes > 0) {
+      str = `${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      str = `${hours}h`;
+    } else {
+      str = `${Math.max(5, minutes)}m`;
+    }
+    setDuration(str);
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-[10px] z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-fadeIn">
@@ -200,19 +222,29 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
               </div>
             </div>
 
-            {/* Duration Pills */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#444748] dark:text-[#a1a1aa]">
-                Duration
-              </span>
-              <div className="flex items-center gap-1.5 h-[38px]">
+            {/* Duration Section */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#444748] dark:text-[#a1a1aa]">
+                  Duration
+                </span>
+                <span className="text-[11px] text-[#006b5e] dark:text-[#8df1de] font-mono font-medium">
+                  Ends at {calculatedEndTime}
+                </span>
+              </div>
+
+              {/* Pre-determined time blocks */}
+              <div className="grid grid-cols-4 gap-2 h-[38px]">
                 {['30m', '45m', '1h', '2h'].map((d) => (
                   <button
                     key={d}
                     type="button"
-                    onClick={() => setDuration(d)}
-                    className={`flex-1 h-full rounded-xl text-xs font-semibold transition-all ${
-                      duration === d
+                    onClick={() => {
+                      setIsCustomDuration(false);
+                      setDuration(d);
+                    }}
+                    className={`h-full rounded-xl text-xs font-semibold transition-all ${
+                      !isCustomDuration && duration === d
                         ? 'bg-[#1b1c19] dark:bg-white text-white dark:text-[#1b1c19] shadow-xs'
                         : 'bg-[#f5f3ee] dark:bg-[#212328] text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white'
                     }`}
@@ -221,6 +253,99 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                   </button>
                 ))}
               </div>
+
+              {/* Custom time button placed under pre-determined time blocks */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomDuration(true);
+                  updateCustomDuration(customHours, customMinutes);
+                }}
+                className={`w-full py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  isCustomDuration
+                    ? 'bg-[#2e4faa] text-white shadow-xs'
+                    : 'bg-[#f5f3ee] dark:bg-[#212328] text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white border border-dashed border-black/[0.08] dark:border-white/[0.08]'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[15px]">tune</span>
+                <span>Set Custom Time</span>
+              </button>
+
+              {/* Expandable Custom Time inputs when Set Custom Time is selected */}
+              {isCustomDuration && (
+                <div className="mt-1 p-3 rounded-xl bg-[#f5f3ee] dark:bg-[#212328] border border-black/[0.04] dark:border-white/[0.05] flex flex-col gap-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-[#1b1c19] dark:text-white flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[15px] text-[#2e4faa]">timer</span>
+                      Set Custom Time:
+                    </span>
+                    <span className="font-mono text-xs text-[#2e4faa] dark:text-[#7d9eff] font-bold">
+                      {duration}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 flex-1 bg-white dark:bg-[#18191d] px-2.5 py-1.5 rounded-lg border border-black/[0.05] dark:border-white/[0.06]">
+                      <label className="text-[11px] font-semibold text-[#444748] dark:text-[#a1a1aa]">Hours:</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={12}
+                        value={customHours}
+                        onChange={(e) => {
+                          const h = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          updateCustomDuration(h, customMinutes);
+                        }}
+                        className="w-full bg-transparent text-xs font-mono font-semibold text-center focus:outline-none"
+                      />
+                      <span className="text-[10px] text-[#747878] dark:text-[#a1a1aa]">hr</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-1 bg-white dark:bg-[#18191d] px-2.5 py-1.5 rounded-lg border border-black/[0.05] dark:border-white/[0.06]">
+                      <label className="text-[11px] font-semibold text-[#444748] dark:text-[#a1a1aa]">Minutes:</label>
+                      <input
+                        type="number"
+                        min={5}
+                        max={59}
+                        step={5}
+                        value={customMinutes}
+                        onChange={(e) => {
+                          const m = Math.max(5, Math.min(59, parseInt(e.target.value, 10) || 5));
+                          updateCustomDuration(customHours, m);
+                        }}
+                        className="w-full bg-transparent text-xs font-mono font-semibold text-center focus:outline-none"
+                      />
+                      <span className="text-[10px] text-[#747878] dark:text-[#a1a1aa]">min</span>
+                    </div>
+                  </div>
+
+                  {/* Quick incremental shortcut chips including < 30min */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    {[
+                      { label: '10m', h: 0, m: 10 },
+                      { label: '15m', h: 0, m: 15 },
+                      { label: '20m', h: 0, m: 20 },
+                      { label: '45m', h: 0, m: 45 },
+                      { label: '1h 15m', h: 1, m: 15 },
+                      { label: '1h 30m', h: 1, m: 30 },
+                      { label: '2h', h: 2, m: 0 },
+                    ].map((chip) => (
+                      <button
+                        key={chip.label}
+                        type="button"
+                        onClick={() => updateCustomDuration(chip.h, chip.m)}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold transition-all ${
+                          customHours === chip.h && customMinutes === chip.m
+                            ? 'bg-[#2e4faa] text-white'
+                            : 'bg-black/[0.04] dark:bg-white/[0.06] text-[#444748] dark:text-[#a1a1aa] hover:bg-black/[0.08]'
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

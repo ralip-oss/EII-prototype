@@ -18,6 +18,7 @@ import { DayDetail } from './components/DayDetail';
 import { WeeklyReview } from './components/WeeklyReview';
 import { AddTaskModal } from './components/AddTaskModal';
 import { AiBatchScheduleModal } from './components/AiBatchScheduleModal';
+import { UploadScheduleModal } from './components/UploadScheduleModal';
 import { HabitSticksModal } from './components/HabitSticksModal';
 import { ZenFocusTimer } from './components/ZenFocusTimer';
 import { SettingsModal } from './components/SettingsModal';
@@ -35,6 +36,7 @@ export default function App() {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [addTaskDefaultDay, setAddTaskDefaultDay] = useState<DayId>(getTodayDayId());
   const [isAiBatchOpen, setIsAiBatchOpen] = useState(false);
+  const [isUploadScheduleOpen, setIsUploadScheduleOpen] = useState(false);
   const [isFocusTimerOpen, setIsFocusTimerOpen] = useState(false);
   const [isHabitsModalOpen, setIsHabitsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -73,7 +75,7 @@ export default function App() {
 
   const [habitSticks, setHabitSticks] = useState<HabitStick[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('weekly_habits_v3');
+      const saved = localStorage.getItem('weekly_habits_v4');
       if (saved) {
         try {
           return JSON.parse(saved);
@@ -82,7 +84,7 @@ export default function App() {
         }
       }
     }
-    return INITIAL_HABIT_STICKS;
+    return [];
   });
 
   const [anchorIntention, setAnchorIntention] = useState<string>(() => {
@@ -111,7 +113,7 @@ export default function App() {
 
   // Sync Habit Sticks to LocalStorage
   useEffect(() => {
-    localStorage.setItem('weekly_habits_v3', JSON.stringify(habitSticks));
+    localStorage.setItem('weekly_habits_v4', JSON.stringify(habitSticks));
   }, [habitSticks]);
 
   // Sync Anchor Intention
@@ -147,6 +149,8 @@ export default function App() {
       }
       if (e.key === 'Escape') {
         setIsAddTaskOpen(false);
+        setIsAiBatchOpen(false);
+        setIsUploadScheduleOpen(false);
         setIsFocusTimerOpen(false);
         setIsHabitsModalOpen(false);
         setIsSettingsOpen(false);
@@ -272,6 +276,10 @@ export default function App() {
     setHabitSticks((prev) => [...prev, newStick]);
   };
 
+  const handleDeleteHabit = (habitId: string) => {
+    setHabitSticks((prev) => prev.filter((h) => h.id !== habitId));
+  };
+
   const handleBatchAddActivities = (newActivities: Task[]) => {
     setTasks((prev) => {
       const updated = [...prev];
@@ -284,11 +292,16 @@ export default function App() {
           existingSameTitle?.color || newAct.color || getTaskColor(newAct.title);
         updated.push({
           ...newAct,
+          isBatchAi: true,
           color,
         });
       });
       return updated;
     });
+  };
+
+  const handleRemoveAllBatchActivities = () => {
+    setTasks((prev) => prev.filter((t) => !t.isBatchAi));
   };
 
   const handleResetData = () => {
@@ -317,6 +330,7 @@ export default function App() {
         }}
         onOpenAddTask={() => handleOpenAddTask()}
         onOpenAiBatch={() => setIsAiBatchOpen(true)}
+        onOpenUploadSchedule={() => setIsUploadScheduleOpen(true)}
         onOpenFocusTimer={() => setIsFocusTimerOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         isDark={isDark}
@@ -341,6 +355,8 @@ export default function App() {
             onSelectDay={handleSelectDay}
             onOpenAddTask={handleOpenAddTask}
             onOpenAiBatch={() => setIsAiBatchOpen(true)}
+            onOpenUploadSchedule={() => setIsUploadScheduleOpen(true)}
+            onRemoveAllBatchActivities={handleRemoveAllBatchActivities}
             weekDays={weekDays}
             anchorIntention={anchorIntention}
             onUpdateAnchorIntention={setAnchorIntention}
@@ -363,7 +379,7 @@ export default function App() {
         )}
 
         {currentView === 'weekly-review' && (
-          <WeeklyReview tasks={tasks} weekDays={weekDays} />
+          <WeeklyReview tasks={tasks} weekDays={weekDays} habitSticks={habitSticks} />
         )}
 
         {currentView === 'habits' && (
@@ -454,7 +470,17 @@ export default function App() {
         isOpen={isAiBatchOpen}
         onClose={() => setIsAiBatchOpen(false)}
         onAddBatchActivities={handleBatchAddActivities}
+        onDeleteTask={handleDeleteTask}
+        onRemoveAllBatchActivities={handleRemoveAllBatchActivities}
         existingActivities={tasks}
+        weekDays={weekDays}
+      />
+
+      {/* Upload Schedule via Image Modal */}
+      <UploadScheduleModal
+        isOpen={isUploadScheduleOpen}
+        onClose={() => setIsUploadScheduleOpen(false)}
+        onAddBatchActivities={handleBatchAddActivities}
         weekDays={weekDays}
       />
 
@@ -465,6 +491,7 @@ export default function App() {
         habitSticks={habitSticks}
         onToggleHabitDay={handleToggleHabitDay}
         onAddHabit={handleAddHabit}
+        onDeleteHabit={handleDeleteHabit}
       />
 
       {/* Zen Focus & Soundscape Timer */}

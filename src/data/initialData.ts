@@ -297,50 +297,7 @@ export function getInitialActivities(weekOffset: number = 0): Task[] {
 
 export const INITIAL_TASKS: Task[] = [];
 
-export const INITIAL_HABIT_STICKS: HabitStick[] = [
-  {
-    id: 'hab-1',
-    title: 'Morning Sunlight (15 min)',
-    category: 'Health',
-    color: '#E8735A',
-    completedDays: { mon: true, tue: true, wed: true, thu: true, fri: false, sat: false, sun: false },
-  },
-  {
-    id: 'hab-2',
-    title: 'Deep Work Block (No tabs)',
-    category: 'Focus',
-    color: '#8DB255',
-    completedDays: { mon: true, tue: true, wed: true, thu: false, fri: false, sat: false, sun: false },
-  },
-  {
-    id: 'hab-3',
-    title: 'Daily Movement / Workout',
-    category: 'Health',
-    color: '#E9A23B',
-    completedDays: { mon: true, tue: true, wed: true, thu: true, fri: false, sat: false, sun: false },
-  },
-  {
-    id: 'hab-4',
-    title: 'Hydration 2.5 Liters',
-    category: 'Health',
-    color: '#3FA796',
-    completedDays: { mon: true, tue: true, wed: false, thu: true, fri: false, sat: false, sun: false },
-  },
-  {
-    id: 'hab-5',
-    title: 'Digital Sunset (21:00)',
-    category: 'Recharge',
-    color: '#8B6FE0',
-    completedDays: { mon: true, tue: false, wed: false, thu: false, fri: false, sat: false, sun: false },
-  },
-  {
-    id: 'hab-6',
-    title: 'Quiet Reading (20 min)',
-    category: 'Mind',
-    color: '#4F86E8',
-    completedDays: { mon: true, tue: true, wed: true, thu: false, fri: false, sat: false, sun: false },
-  },
-];
+export const INITIAL_HABIT_STICKS: HabitStick[] = [];
 
 export const INITIAL_ROLLOVER_TASKS: Task[] = [];
 
@@ -361,7 +318,7 @@ export const INITIAL_MICRO_VICTORIES: MicroVictory[] = [
 ];
 
 export const HOTLINKED_ASSETS = {
-  logo: 'https://lh3.googleusercontent.com/aida/AEtjO1Xeh_uJl4eDch1t4Zoir3_TWbiHmccJ-KU7v4AL9P038dlEyCpr1xGJHGUZYu8ePQG6NEJrs42Wxi31TA989BTE-G9gyGZVUT3XfZB5JiLSH9n230abbIWLTc3uvb6Jg41xyP9wlvxxIE91Nvq06LKZtrav-10OLBlfytvS4H2EukZprgTRaa11jzdLKi3bTs6N0DXZC68_XYSmh-0M2RxQbpeTG4dLg2juCGHY-Jq0Nir3X2Qsf_c9_8iK',
+  logo: '/logo.svg',
   workspaceAmbience:
     'https://lh3.googleusercontent.com/aida-public/AB6AXuDwtM3Pq5DKBjJvUAbsmvwdytV2l8E0d82ML8oA1nOBV2SflCDf_w7PnoyG1Cr0dPcXkpmM4IVj7a5Mw5QsE55f3xxwj3kJ7AENgnRflY8b3diRVNz6iaXmeITFieMaGeT8Qtex-szskI-lyn3CdXIMZZHalRtKhFWl_1pHKLoAN44SsTHJL8Ia4hZhfuaDhsi3TnWiQDW6xhIBGZHE27fZ5kXtVEY_zSdV-xQzhj2ZvbCLmQ7LmZHZLw',
   serenityCard:

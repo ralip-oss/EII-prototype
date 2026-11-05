@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { DayId, Task } from '../types';
 import { HOTLINKED_ASSETS } from '../data/initialData';
-import { CalendarDay } from '../utils/dateUtils';
+import { CalendarDay, durationToMinutes } from '../utils/dateUtils';
 import { zenAudio } from '../utils/audio';
 
 interface DayDetailProps {
@@ -52,6 +52,17 @@ export const DayDetail: React.FC<DayDetailProps> = ({
   const completedTasks = dayTasks.filter((t) => t.completed).length;
   const todoTasks = totalTasks - completedTasks;
   const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // Dynamic scheduled hours and minutes
+  const totalMinutesScheduled = dayTasks.reduce((acc, t) => {
+    return acc + durationToMinutes(t.duration, t.time, t.endTime);
+  }, 0);
+  const hoursScheduled = Math.floor(totalMinutesScheduled / 60);
+  const minsScheduled = totalMinutesScheduled % 60;
+  const scheduledTimeStr =
+    totalMinutesScheduled > 0
+      ? `${hoursScheduled > 0 ? `${hoursScheduled}h ` : ''}${minsScheduled > 0 ? `${minsScheduled}m` : ''} scheduled`
+      : '0h 0m scheduled';
 
   // Filtered list
   const filteredTasks = dayTasks.filter((t) => {
@@ -155,7 +166,7 @@ export const DayDetail: React.FC<DayDetailProps> = ({
             <span>Tokyo • GMT+9</span>
           </div>
           <div className="flex items-baseline gap-3 flex-wrap">
-            <h1 className="font-headline font-semibold text-3xl sm:text-4xl text-[#1b1c19] dark:text-[#f2f0ea] tracking-tight">
+            <h1 className="font-serif font-normal text-3xl sm:text-4xl text-[#1b1c19] dark:text-[#f2f0ea] tracking-tight">
               {activeDay.dayName}, {activeDay.monthName} {activeDay.dayNumber}
             </h1>
             <span className="font-headline text-xl text-[#444748] dark:text-[#a1a1aa]/70 font-normal">
@@ -203,10 +214,10 @@ export const DayDetail: React.FC<DayDetailProps> = ({
             <div className="flex items-center gap-2 text-xs text-[#444748] dark:text-[#a1a1aa] pt-0.5">
               <span className="flex items-center gap-1 font-semibold" style={{ color: activeDay.color }}>
                 <span className="material-symbols-outlined text-[14px]">trending_up</span>
-                On Track
+                {totalTasks === 0 ? 'Clear Schedule' : completedTasks === totalTasks ? 'Complete' : 'In Progress'}
               </span>
               <span>•</span>
-              <span>4h 45m scheduled</span>
+              <span>{scheduledTimeStr}</span>
             </div>
           </div>
         </div>
@@ -687,7 +698,7 @@ export const DayDetail: React.FC<DayDetailProps> = ({
                 <span>Workspace Ambience</span>
               </div>
               <span className="px-2 py-0.5 rounded-full bg-[#f0eee9] dark:bg-[#25262c] text-xs text-[#1b1c19] dark:text-white font-medium">
-                Oct 16
+                {activeDay.monthName} {activeDay.dayNumber}
               </span>
             </div>
 

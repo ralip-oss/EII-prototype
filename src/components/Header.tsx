@@ -6,6 +6,7 @@ interface HeaderProps {
   onNavigate: (view: 'week-overview' | 'day-detail' | 'weekly-review' | 'habits') => void;
   onOpenAddTask: () => void;
   onOpenAiBatch: () => void;
+  onOpenUploadSchedule?: () => void;
   onOpenFocusTimer: () => void;
   onOpenSettings?: () => void;
   isDark: boolean;
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigate,
   onOpenAddTask,
   onOpenAiBatch,
+  onOpenUploadSchedule,
   onOpenFocusTimer,
   onOpenSettings,
   isDark,
@@ -31,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   onResetToday,
 }) => {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -54,11 +57,24 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-2.5 text-left group focus:outline-none"
             title="Weekly Home"
           >
-            <img
-              alt="Weekly Logo"
-              className="h-8 w-auto object-contain transition-transform group-hover:scale-105"
-              src={HOTLINKED_ASSETS.logo}
-            />
+            {!logoError ? (
+              <img
+                alt="Weekly Logo"
+                className="h-8 w-8 rounded-xl object-contain shadow-xs transition-transform group-hover:scale-105"
+                src={HOTLINKED_ASSETS.logo || '/logo.svg'}
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[#2e4faa] to-[#1c3373] p-1.5 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+                <svg viewBox="0 0 48 48" className="w-full h-full fill-none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="11" y="21" width="5.5" height="15" rx="2.75" fill="white" opacity="0.85" />
+                  <rect x="19" y="13" width="5.5" height="23" rx="2.75" fill="white" />
+                  <circle cx="21.75" cy="8.5" r="2.25" fill="#8df1de" />
+                  <rect x="27" y="17" width="5.5" height="19" rx="2.75" fill="white" opacity="0.9" />
+                  <rect x="35" y="25" width="5.5" height="11" rx="2.75" fill="#8df1de" opacity="0.95" />
+                </svg>
+              </div>
+            )}
             <span className="font-headline font-semibold text-xl tracking-tight text-[#1b1c19] dark:text-[#f2f0ea]">
               Weekly
             </span>
@@ -119,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <span className="material-symbols-outlined text-[18px]">chevron_left</span>
           </button>
-          <span className="font-headline font-semibold text-xs tracking-tight text-[#1b1c19] dark:text-[#f2f0ea] px-2 select-none">
+          <span className="font-serif font-normal text-xs sm:text-sm tracking-tight text-[#1b1c19] dark:text-[#f2f0ea] px-2 select-none">
             {weekRangeText}
           </span>
           <button
@@ -148,6 +164,18 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="material-symbols-outlined text-[16px]">graphic_eq</span>
             <span>Soundscape</span>
           </button>
+
+          {/* Upload Schedule CTA */}
+          {onOpenUploadSchedule && (
+            <button
+              onClick={onOpenUploadSchedule}
+              title="Upload Schedule from Image"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#2e4faa] dark:text-[#7d9eff] bg-[#2e4faa]/10 dark:bg-[#2e4faa]/20 hover:bg-[#2e4faa]/20 transition-all border border-[#2e4faa]/25 shadow-xs cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">photo_camera</span>
+              <span className="hidden xl:inline">Upload Schedule</span>
+            </button>
+          )}
 
           {/* AI Batch Scheduling CTA (secondary button accent 2e4faa) */}
           <button

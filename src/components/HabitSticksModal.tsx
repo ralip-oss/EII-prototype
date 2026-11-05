@@ -9,6 +9,7 @@ interface HabitSticksModalProps {
   habitSticks: HabitStick[];
   onToggleHabitDay: (habitId: string, dayId: DayId) => void;
   onAddHabit: (title: string, category: string, color: string) => void;
+  onDeleteHabit?: (habitId: string) => void;
 }
 
 export const HabitSticksModal: React.FC<HabitSticksModalProps> = ({
@@ -17,11 +18,13 @@ export const HabitSticksModal: React.FC<HabitSticksModalProps> = ({
   habitSticks,
   onToggleHabitDay,
   onAddHabit,
+  onDeleteHabit,
 }) => {
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('Health');
   const [newColor, setNewColor] = useState('#8DB255');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [habitToDelete, setHabitToDelete] = useState<HabitStick | null>(null);
 
   if (!isOpen) return null;
 
@@ -60,16 +63,16 @@ export const HabitSticksModal: React.FC<HabitSticksModalProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.04]">
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#006b5e] dark:bg-[#8df1de]"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#2e4faa] dark:bg-[#7d9eff]"></span>
               <h2
                 id="habit-sticks-title"
                 className="font-headline font-semibold text-xl text-[#1b1c19] dark:text-white"
               >
-                Tactile Habit Sticks
+                Stickies Tracker
               </h2>
             </div>
             <p className="text-xs text-[#444748] dark:text-[#a1a1aa]">
-              Inspired by physical habit blocks. Tap each day to slot in your mindful ritual.
+              Inspired by tactile habit blocks. Tap each day to slot in your mindful ritual.
             </p>
           </div>
           <button
@@ -81,77 +84,103 @@ export const HabitSticksModal: React.FC<HabitSticksModalProps> = ({
           </button>
         </div>
 
-        {/* Days Header */}
-        <div className="flex items-center justify-between px-3 text-[11px] font-semibold text-[#444748] dark:text-[#a1a1aa] uppercase tracking-wider">
-          <span>Habit Ritual</span>
-          <div className="flex items-center gap-2.5 sm:gap-3.5 pr-2">
+        {/* Days Header - mathematically aligned with each day checkbox column */}
+        <div className="flex items-center justify-between px-3 sm:px-3.5 text-[11px] font-semibold text-[#444748] dark:text-[#a1a1aa] uppercase tracking-wider">
+          <span className="flex-1">Stickie Ritual</span>
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {DAYS_CONFIG.map((d) => (
-              <span key={d.id} className="w-6 text-center">
+              <div key={d.id} className="w-6 sm:w-7 text-center font-bold">
                 {d.shortName[0]}
-              </span>
+              </div>
             ))}
-            <span className="w-10 text-right">Streak</span>
+            <div className="w-10 text-right">Streak</div>
+            <div className="w-6 sm:w-7"></div>
           </div>
         </div>
 
-        {/* Habit Sticks List (Tactile Wooden/Pastel feeling) */}
+        {/* Habit Sticks List */}
         <div className="flex flex-col gap-2.5 max-h-[380px] overflow-y-auto pr-1">
-          {habitSticks.map((habit) => {
-            const streak = calculateStreak(habit);
-            return (
-              <div
-                key={habit.id}
-                className="p-3 sm:p-3.5 rounded-xl bg-[#f5f3ee] dark:bg-[#202126] border border-black/[0.03] dark:border-white/[0.04] flex items-center justify-between gap-3 group hover:shadow-xs transition-all"
-              >
-                {/* Habit Info */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className="w-2.5 h-7 rounded-sm shrink-0 shadow-xs"
-                    style={{ backgroundColor: habit.color }}
-                  />
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-xs sm:text-sm font-semibold text-[#1b1c19] dark:text-white truncate">
-                      {habit.title}
-                    </span>
-                    <span className="text-[10px] text-[#444748] dark:text-[#a1a1aa]">
-                      {habit.category}
-                    </span>
+          {habitSticks.length === 0 ? (
+            <div className="py-8 text-center flex flex-col items-center justify-center gap-2 text-xs text-[#747878] dark:text-[#a1a1aa] bg-[#fbf9f4] dark:bg-[#151619] rounded-xl border border-dashed border-black/[0.08] dark:border-white/[0.08]">
+              <span className="material-symbols-outlined text-[28px] text-[#2e4faa] dark:text-[#7d9eff] opacity-60">
+                sticky_note_2
+              </span>
+              <span>No stickies tracked yet.</span>
+              <span className="text-[11px] opacity-75">
+                Click "+ Add New Stickie" below to create your first habit ritual.
+              </span>
+            </div>
+          ) : (
+            habitSticks.map((habit) => {
+              const streak = calculateStreak(habit);
+              return (
+                <div
+                  key={habit.id}
+                  className="p-3 sm:p-3.5 rounded-xl bg-[#f5f3ee] dark:bg-[#202126] border border-black/[0.03] dark:border-white/[0.04] flex items-center justify-between gap-3 group hover:shadow-xs transition-all"
+                >
+                  {/* Habit Info */}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div
+                      className="w-2.5 h-7 rounded-sm shrink-0 shadow-xs"
+                      style={{ backgroundColor: habit.color }}
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs sm:text-sm font-semibold text-[#1b1c19] dark:text-white truncate">
+                        {habit.title}
+                      </span>
+                      <span className="text-[10px] text-[#444748] dark:text-[#a1a1aa]">
+                        {habit.category}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                {/* Day Blocks */}
-                <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
-                  {DAYS_CONFIG.map((d) => {
-                    const isChecked = !!habit.completedDays[d.id];
-                    return (
+                  {/* Day Blocks - aligned with header column */}
+                  <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+                    {DAYS_CONFIG.map((d) => {
+                      const isChecked = !!habit.completedDays[d.id];
+                      return (
+                        <div key={d.id} className="w-6 sm:w-7 flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => handleToggle(habit.id, d.id)}
+                            title={`${habit.title} on ${d.name}`}
+                            className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-xs cursor-pointer ${
+                              isChecked
+                                ? 'text-white scale-100'
+                                : 'bg-white dark:bg-[#282a30] text-transparent hover:border-black/20 dark:hover:border-white/20 border border-black/[0.06] dark:border-white/[0.06]'
+                            }`}
+                            style={isChecked ? { backgroundColor: habit.color } : {}}
+                          >
+                            <span className="material-symbols-outlined text-[14px] font-bold">
+                              check
+                            </span>
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    <div className="w-10 text-right">
+                      <span className="text-xs font-mono font-bold text-[#2e4faa] dark:text-[#7d9eff]">
+                        {streak}/7
+                      </span>
+                    </div>
+
+                    {/* Delete button (with accidental deletion confirmation) */}
+                    <div className="w-6 sm:w-7 flex items-center justify-center">
                       <button
-                        key={d.id}
                         type="button"
-                        onClick={() => handleToggle(habit.id, d.id)}
-                        title={`${habit.title} on ${d.name}`}
-                        className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-xs ${
-                          isChecked
-                            ? 'text-white scale-100'
-                            : 'bg-white dark:bg-[#282a30] text-transparent hover:border-black/20 dark:hover:border-white/20 border border-black/[0.06] dark:border-white/[0.06]'
-                        }`}
-                        style={isChecked ? { backgroundColor: habit.color } : {}}
+                        onClick={() => setHabitToDelete(habit)}
+                        title={`Remove ${habit.title}`}
+                        className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded flex items-center justify-center text-[#747878] hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-[14px] font-bold">
-                          check
-                        </span>
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
                       </button>
-                    );
-                  })}
-
-                  <div className="w-10 text-right">
-                    <span className="text-xs font-mono font-bold text-[#006b5e] dark:text-[#8df1de]">
-                      {streak}/7
-                    </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {/* Add Habit Stick Form */}
@@ -162,7 +191,7 @@ export const HabitSticksModal: React.FC<HabitSticksModalProps> = ({
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[#1b1c19] dark:text-white">
-                New Habit Stick
+                New Stickie
               </span>
               <button
                 type="button"
@@ -207,19 +236,19 @@ export const HabitSticksModal: React.FC<HabitSticksModalProps> = ({
             </div>
             <button
               type="submit"
-              className="py-2 bg-[#2e4faa] hover:bg-[#25418f] text-white rounded-xl text-xs font-semibold transition-opacity"
+              className="py-2 bg-[#2e4faa] hover:bg-[#25418f] text-white rounded-xl text-xs font-semibold transition-opacity cursor-pointer"
             >
-              Add Stick
+              Add Stickie
             </button>
           </form>
         ) : (
           <button
             type="button"
             onClick={() => setShowAddForm(true)}
-            className="py-2.5 px-4 rounded-xl border border-dashed border-black/[0.15] dark:border-white/[0.15] text-xs font-semibold text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white hover:bg-black/[0.02] dark:hover:bg-white/[0.02] flex items-center justify-center gap-1.5 transition-all"
+            className="py-2.5 px-4 rounded-xl border border-dashed border-black/[0.15] dark:border-white/[0.15] text-xs font-semibold text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white hover:bg-black/[0.02] dark:hover:bg-white/[0.02] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">add</span>
-            <span>Add New Habit Stick</span>
+            <span>+ Add New Stickie</span>
           </button>
         )}
 
@@ -227,12 +256,54 @@ export const HabitSticksModal: React.FC<HabitSticksModalProps> = ({
           <span>Consistency over perfection. No streaks penalty.</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-[#1b1c19] dark:bg-white text-white dark:text-[#1b1c19] font-semibold text-xs"
+            className="px-4 py-1.5 rounded-lg bg-[#1b1c19] dark:bg-white text-white dark:text-[#1b1c19] font-semibold text-xs cursor-pointer"
           >
             Done
           </button>
         </div>
       </div>
+
+      {/* Accidental Deletion Confirmation Modal */}
+      {habitToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-60 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-[#202126] rounded-2xl p-6 max-w-sm w-full border border-black/[0.08] dark:border-white/[0.1] shadow-2xl flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[22px]">warning</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <h3 className="font-headline font-semibold text-sm text-[#1b1c19] dark:text-white">
+                  Remove Stickie?
+                </h3>
+                <p className="text-xs text-[#747878] dark:text-[#a1a1aa] leading-relaxed">
+                  Are you sure you want to delete <strong className="text-[#1b1c19] dark:text-white">"{habitToDelete.title}"</strong>? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-black/[0.04] dark:border-white/[0.05]">
+              <button
+                type="button"
+                onClick={() => setHabitToDelete(null)}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-[#444748] dark:text-[#a1a1aa] hover:text-[#1b1c19] dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.04] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteHabit?.(habitToDelete.id);
+                  setHabitToDelete(null);
+                  zenAudio.playChime();
+                }}
+                className="px-4 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+              >
+                Delete Stickie
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

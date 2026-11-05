@@ -28,6 +28,7 @@ export interface Task {
   focusPlaylist?: string;
   quietReminder?: boolean;
   isArchived?: boolean;
+  isBatchAi?: boolean;
 }
 
 export interface DayInfo {
