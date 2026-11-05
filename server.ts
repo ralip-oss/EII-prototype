@@ -240,8 +240,11 @@ app.post('/api/gemini/parse-schedule-image', async (req, res) => {
     // Clean base64 string
     const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
 
-    const ocrPrompt = `You are an expert schedule extraction AI. Analyze this image of a schedule or timetable carefully and extract all scheduled events, classes, meetings, or activities.
-The image may be a photo of a weekly planner, timetable, school syllabus, printed sheet, or mobile screenshot.
+    const ocrPrompt = `You are an expert schedule extraction AI. Analyze this image of a schedule or timetable carefully and extract EVERY SINGLE scheduled event, class, meeting, or activity.
+
+CRITICAL RULES:
+1. Extract ALL activities present (there are multiple in the image). Do not stop after finding just one.
+2. Be extremely precise: DO NOT add, guess, or hallucinate any activities, events, or times that are not visibly written in the image.
 
 For each activity found:
 - title: concise title/name of the activity (e.g. "Linear Algebra", "Team Standup", "Gym Workout")
