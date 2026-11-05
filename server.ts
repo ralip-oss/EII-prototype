@@ -144,7 +144,7 @@ Produce a balanced, optimal weekly plan with start time ("HH:MM") and end time (
     if (process.env.GEMINI_API_KEY) {
       try {
         const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-3.5-flash',
           contents: userPrompt,
           config: {
             systemInstruction: systemPrompt,
